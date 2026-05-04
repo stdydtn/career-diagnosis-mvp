@@ -100,13 +100,27 @@ export default function AdminSubmissionsPage() {
   };
 
   if (!configuredKey) {
+    const prod = import.meta.env.PROD;
     return (
       <main className="min-h-screen bg-slate-100 px-4 py-12 text-slate-900">
         <div className="mx-auto max-w-lg rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
           <h1 className="text-xl font-black">관리자 페이지 비활성</h1>
           <p className="mt-3 text-sm leading-relaxed text-slate-600">
-            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">VITE_ADMIN_KEY</code> 가 비어 있습니다. 프로젝트 루트의 <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">.env.local</code> 에 한 줄로 추가하고 파일을 저장한 뒤, 터미널에서 dev 서버를 완전히 종료했다가 <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">npm run dev</code> 로 다시 띄우세요. 값에 특수문자가 있으면 따옴표로 감싸면 안전합니다. 예:{" "}
-            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">VITE_ADMIN_KEY=&quot;내_비밀문자열&quot;</code>
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">VITE_ADMIN_KEY</code> 가 이 빌드에 포함되어 있지 않습니다.
+            {prod ? (
+              <>
+                {" "}
+                <strong>Vercel</strong> → 해당 프로젝트 → <strong>Settings → Environment Variables</strong>에 이름{" "}
+                <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">VITE_ADMIN_KEY</code> 로 임의의 긴 비밀 문자열을 넣고{" "}
+                <strong>Redeploy</strong>하세요. Preview URL만 쓰면 Preview 환경에도 같은 변수를 추가하세요. (로컬의 <code className="font-mono text-xs">.env.local</code>은 배포에 올라가지 않습니다.)
+              </>
+            ) : (
+              <>
+                {" "}
+                프로젝트 루트 <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">.env.local</code> 에{" "}
+                <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">VITE_ADMIN_KEY=...</code> 한 줄을 추가하고 저장한 뒤, 터미널에서 dev 서버를 끄고 <code className="font-mono text-xs">npm run dev</code> 로 다시 실행하세요.
+              </>
+            )}
           </p>
           <a className="mt-6 inline-block text-sm font-bold text-indigo-600 hover:underline" href="#/">
             ← MVP 로 돌아가기

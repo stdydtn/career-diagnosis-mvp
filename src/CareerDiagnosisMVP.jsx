@@ -13,7 +13,6 @@ import {
 import {
   average,
   buildCoverLetterReview,
-  buildPlainTextReport,
   computeScores,
   createDetailedReport,
   getReadinessLevel,
@@ -335,6 +334,35 @@ function DiagnosisPage({ answers, setAnswers, result, isComplete, switchTab, pro
   );
 }
 
+/** html2canvas 캡처(한글·영문 유지) → jsPDF 다페이지 */
+function appendCanvasToPdfMm(canvas, pdf, marginMm = 8) {
+  const pageW = pdf.internal.pageSize.getWidth() - marginMm * 2;
+  const pageH = pdf.internal.pageSize.getHeight() - marginMm * 2;
+  const totalImgH_mm = (pageW * canvas.height) / canvas.width;
+  const slicePx = Math.max(1, Math.ceil((canvas.height * pageH) / totalImgH_mm));
+
+  let srcY = 0;
+  let first = true;
+  while (srcY < canvas.height) {
+    if (!first) pdf.addPage();
+    first = false;
+    const sliceH = Math.min(slicePx, canvas.height - srcY);
+
+    const sliceCanvas = document.createElement("canvas");
+    sliceCanvas.width = canvas.width;
+    sliceCanvas.height = sliceH;
+    const sctx = sliceCanvas.getContext("2d");
+    sctx.fillStyle = "#ffffff";
+    sctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+    sctx.drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+
+    const imgData = sliceCanvas.toDataURL("image/png", 0.92);
+    const sliceH_mm = (pageW * sliceH) / canvas.width;
+    pdf.addImage(imgData, "PNG", marginMm, marginMm, pageW, sliceH_mm);
+    srcY += sliceH;
+  }
+}
+
 function FeedbackSurveyPage({
   feedback,
   setFeedback,
@@ -440,45 +468,46 @@ function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmi
       return;
     }
 
+    const el = document.getElementById("career-report-print-area");
+    if (!el) {
+      alert("PDF로 저장할 리포트 영역을 찾을 수 없습니다.");
+      return;
+    }
+
     try {
       setIsSavingPdf(true);
-      const jspdfModule = await import("jspdf");
+      if (typeof document !== "undefined" && document.fonts?.ready) {
+        await document.fonts.ready;
+      }
+
+      const [jspdfModule, html2canvasMod] = await Promise.all([import("jspdf"), import("html2canvas")]);
       const JsPDF = jspdfModule.jsPDF || jspdfModule.default;
+      const html2canvas = html2canvasMod.default;
       const pdf = new JsPDF({ orientation: "p", unit: "mm", format: "a4" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 14;
-      const maxWidth = pageWidth - margin * 2;
-      const lineHeight = 7;
-      let y = margin;
 
-      const addText = (text, options = {}) => {
-        const fontSize = options.fontSize || 11;
-        const gap = options.gap || 2;
-        pdf.setFontSize(fontSize);
-        const lines = pdf.splitTextToSize(String(text), maxWidth);
-        lines.forEach((line) => {
-          if (y > pageHeight - margin) {
-            pdf.addPage();
-            y = margin;
-          }
-          pdf.text(line, margin, y);
-          y += lineHeight;
-        });
-        y += gap;
-      };
-
-      buildPlainTextReport(report).forEach((line, index) => {
-        if (index === 0) addText(line, { fontSize: 16, gap: 5 });
-        else if (line.startsWith("[")) addText(line, { fontSize: 13, gap: 3 });
-        else addText(line, { fontSize: 10, gap: 1 });
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        windowWidth: Math.max(el.scrollWidth, 720),
+        onclone: (_doc, cloned) => {
+          cloned.querySelectorAll("button").forEach((btn) => {
+            btn.style.setProperty("display", "none", "important");
+          });
+          const w = Math.max(cloned.scrollWidth, 720);
+          cloned.style.width = `${w}px`;
+          cloned.style.maxWidth = `${w}px`;
+        },
       });
+
+      appendCanvasToPdfMm(canvas, pdf, 8);
 
       const safeName = (report.participant?.name || "career-report").replace(/[^가-힣a-zA-Z0-9_-]/g, "_");
       pdf.save(`${safeName}_커리어_상세리포트.pdf`);
     } catch (error) {
       console.error(error);
-      alert("PDF 생성 중 오류가 발생했습니다. jsPDF 설치 여부를 확인해주세요. 대안으로 브라우저 인쇄 기능을 실행합니다.");
+      alert("PDF 생성 중 오류가 발생했습니다. html2canvas·jsPDF 로그를 확인해주세요. 대안으로 브라우저 인쇄 기능을 실행합니다.");
       if (typeof window !== "undefined" && typeof window.print === "function") window.print();
     } finally {
       setIsSavingPdf(false);
