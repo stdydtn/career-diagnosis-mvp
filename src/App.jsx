@@ -1,5 +1,1 @@
-import CareerDiagnosisMVP from "./CareerDiagnosisMVP.jsx";
-
-export default function App() {
-  return <CareerDiagnosisMVP />;
-}
+export { default } from "./CareerDiagnosisMVP.jsx";
