@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   aptitudeLabels,
   buildDiagnosisPages,
@@ -20,6 +20,16 @@ import {
   pct,
   topEntries,
 } from "./CareerDiagnosisUtils.js";
+import {
+  insertDiagnosisProfile,
+  updateDiagnosisAfterFeedback,
+  updateDiagnosisAfterQuestions,
+  updateDiagnosisProfile,
+} from "./lib/saveDiagnosis.js";
+
+function phase2SessionKey(submissionId) {
+  return `mvp_diag_phase2_${submissionId}`;
+}
 
 function ScoreBar({ label, value, description }) {
   const safeValue = Math.max(0, Math.min(100, value || 0));
@@ -62,7 +72,7 @@ function SelectField({ label, value, onChange, options, placeholder = "선택해
   );
 }
 
-function ProfileForm({ profile, setProfile, onStart }) {
+function ProfileForm({ profile, setProfile, onStart, startBusy }) {
   const update = (field, value) => setProfile((prev) => ({ ...prev, [field]: value }));
   const requiredDone = profile.name.trim() && profile.email.trim() && profile.ageGroup && profile.status && profile.privacyConsent;
 
@@ -78,7 +88,7 @@ function ProfileForm({ profile, setProfile, onStart }) {
         <div className="mb-6">
           <p className="text-sm font-bold text-slate-500">PARTICIPANT INFO</p>
           <h3 className="text-2xl font-black tracking-tight">개인정보 및 진로정보</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-500">현재 MVP에서는 입력값이 브라우저 상태에만 저장되며, 별도 서버나 데이터베이스로 전송되지 않습니다.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-500">「진단 시작하기」를 누르면 1차로 프로필이 Supabase에 저장됩니다. 45문항을 모두 응답하면 같은 참가 행에 답변·진단 결과가 2차 저장됩니다.</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -116,8 +126,8 @@ function ProfileForm({ profile, setProfile, onStart }) {
 
         <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <p className="text-sm leading-6 text-slate-500">* 표시 항목과 필수 동의가 완료되어야 진단을 시작할 수 있습니다.</p>
-          <button type="button" onClick={onStart} disabled={!requiredDone} className="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
-            진단 시작하기
+          <button type="button" onClick={onStart} disabled={!requiredDone || startBusy} className="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
+            {startBusy ? "저장 중…" : "진단 시작하기"}
           </button>
         </div>
       </section>
@@ -144,7 +154,7 @@ function ProfileSummary({ profile, onEdit }) {
   );
 }
 
-function DiagnosisPage({ answers, setAnswers, result, isComplete, switchTab, profile, profileReady, setProfileReady, setGeneratedReport, feedback }) {
+function DiagnosisPage({ answers, setAnswers, result, isComplete, switchTab, profile, profileReady, setProfileReady, setGeneratedReport, feedback, onStartDiagnosis, startBusy }) {
   const pages = useMemo(() => buildDiagnosisPages(), []);
   const [currentPage, setCurrentPage] = useState(0);
   const questionTopRef = useRef(null);
@@ -167,7 +177,7 @@ function DiagnosisPage({ answers, setAnswers, result, isComplete, switchTab, pro
   };
 
   if (!profileReady) {
-    return <ProfileForm profile={profile.value} setProfile={profile.set} onStart={() => setProfileReady(true)} />;
+    return <ProfileForm profile={profile.value} setProfile={profile.set} onStart={onStartDiagnosis} startBusy={startBusy} />;
   }
 
   return (
@@ -325,14 +335,40 @@ function DiagnosisPage({ answers, setAnswers, result, isComplete, switchTab, pro
   );
 }
 
-function FeedbackSurveyPage({ feedback, setFeedback, isComplete, result, profile, setGeneratedReport, switchTab }) {
+function FeedbackSurveyPage({
+  feedback,
+  setFeedback,
+  isComplete,
+  result,
+  profile,
+  submissionId,
+  setGeneratedReport,
+  switchTab,
+}) {
   const update = (field, value) => setFeedback((prev) => ({ ...prev, [field]: value }));
   const canSubmit = isComplete && feedback.satisfaction && feedback.usefulness && feedback.easyToUse && feedback.recommend && feedback.paidIntent && feedback.improvement.trim();
 
-  const submitSurvey = () => {
+  const submitSurvey = async () => {
     if (!canSubmit) return;
-    setGeneratedReport(createDetailedReport(result, profile, feedback));
-    switchTab("basicReport");
+
+    try {
+      const report = createDetailedReport(result, profile, feedback);
+
+      if (!submissionId) {
+        alert("저장 세션이 없습니다. 커리어 진단 탭에서 개인정보를 입력한 뒤 「진단 시작하기」로 1차 저장을 완료한 다음 다시 시도하세요.");
+        return;
+      }
+
+      await updateDiagnosisAfterFeedback(submissionId, { feedback, detailedReport: report });
+
+      setGeneratedReport(report);
+      switchTab("basicReport");
+    } catch (error) {
+      const msg = error?.message || String(error);
+      const details = error?.details || error?.hint || "";
+      console.error(error);
+      alert(`데이터 저장 중 오류가 발생했습니다.\n\n${msg}${details ? `\n${details}` : ""}\n\nVercel: Environment Variables(VITE_SUPABASE_*) 후 재배포. Supabase: patch_anon_select.sql·patch_answers_and_update.sql(RLS·UPDATE·answers).`);
+    }
   };
 
   if (!isComplete) {
@@ -725,6 +761,8 @@ export default function CareerDiagnosisMVP() {
   const [feedback, setFeedback] = useState(emptyFeedback);
   const [profile, setProfile] = useState(emptyProfile);
   const [profileReady, setProfileReady] = useState(false);
+  const [submissionId, setSubmissionId] = useState(null);
+  const [startBusy, setStartBusy] = useState(false);
   const appTopRef = useRef(null);
   const isComplete = Object.keys(answers).length === questions.length;
   const feedbackSubmitted = Boolean(feedback.satisfaction && feedback.usefulness && feedback.easyToUse && feedback.recommend && feedback.paidIntent && feedback.improvement.trim());
@@ -749,12 +787,82 @@ export default function CareerDiagnosisMVP() {
     return { interest, personality, aptitude, maturityAvg, readinessAvg, topRIASEC, topPersonality, topAptitude, level, jobs, summary };
   }, [answers, profile.name]);
 
+  const answersRef = useRef(answers);
+  const resultRef = useRef(result);
+  answersRef.current = answers;
+  resultRef.current = result;
+
+  useEffect(() => {
+    if (!isComplete || !submissionId) return;
+    try {
+      if (sessionStorage.getItem(phase2SessionKey(submissionId))) return;
+    } catch {
+      /* ignore */
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await updateDiagnosisAfterQuestions(submissionId, {
+          answers: answersRef.current,
+          result: resultRef.current,
+        });
+        if (!cancelled) {
+          try {
+            sessionStorage.setItem(phase2SessionKey(submissionId), "1");
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const msg = error?.message || String(error);
+          console.error(error);
+          alert(`2차 저장(문항·결과)에 실패했습니다.\n\n${msg}\n\nSupabase에서 UPDATE 정책·grant 및 answers 컬럼(patch_answers_and_update.sql, patch_anon_select.sql)을 확인하세요.`);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isComplete, submissionId]);
+
+  const handleStartDiagnosis = async () => {
+    if (startBusy) return;
+    setStartBusy(true);
+    try {
+      if (submissionId) {
+        await updateDiagnosisProfile(submissionId, profile);
+      } else {
+        const row = await insertDiagnosisProfile(profile);
+        const id = row?.id;
+        if (id) setSubmissionId(id);
+      }
+      setProfileReady(true);
+    } catch (error) {
+      const msg = error?.message || String(error);
+      const details = error?.details || error?.hint || "";
+      console.error(error);
+      alert(`1차 저장에 실패했습니다.\n\n${msg}${details ? `\n${details}` : ""}\n\nVercel이면 VITE_SUPABASE_* 환경 변수 후 재배포. Supabase는 patch_anon_select.sql(INSERT·SELECT)을 실행했는지 확인하세요.`);
+    } finally {
+      setStartBusy(false);
+    }
+  };
+
   const switchTab = (tab) => {
     setActiveTab(tab);
     setTimeout(() => appTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const resetAll = () => {
+    try {
+      if (submissionId) sessionStorage.removeItem(phase2SessionKey(submissionId));
+    } catch {
+      /* ignore */
+    }
+    setSubmissionId(null);
     setAnswers({});
     setGeneratedReport(null);
     setFeedback(emptyFeedback);
@@ -789,9 +897,33 @@ export default function CareerDiagnosisMVP() {
       </header>
 
       {activeTab === "diagnosis" ? (
-        <DiagnosisPage answers={answers} setAnswers={setAnswers} result={result} isComplete={isComplete} switchTab={switchTab} profile={{ value: profile, set: setProfile }} profileReady={profileReady} setProfileReady={setProfileReady} setGeneratedReport={setGeneratedReport} feedback={feedback} />
+        <DiagnosisPage
+          answers={answers}
+          setAnswers={setAnswers}
+          result={result}
+          isComplete={isComplete}
+          switchTab={switchTab}
+          profile={{ value: profile, set: setProfile }}
+          profileReady={profileReady}
+          setProfileReady={setProfileReady}
+          setGeneratedReport={setGeneratedReport}
+          feedback={feedback}
+          onStartDiagnosis={handleStartDiagnosis}
+          startBusy={startBusy}
+        />
       ) : null}
-      {activeTab === "feedback" ? <FeedbackSurveyPage feedback={feedback} setFeedback={setFeedback} isComplete={isComplete} result={result} profile={profile} setGeneratedReport={setGeneratedReport} switchTab={switchTab} /> : null}
+      {activeTab === "feedback" ? (
+        <FeedbackSurveyPage
+          feedback={feedback}
+          setFeedback={setFeedback}
+          isComplete={isComplete}
+          result={result}
+          profile={profile}
+          submissionId={submissionId}
+          setGeneratedReport={setGeneratedReport}
+          switchTab={switchTab}
+        />
+      ) : null}
       {activeTab === "basicReport" ? <BasicReportPage generatedReport={generatedReport} isComplete={isComplete} switchTab={switchTab} feedbackSubmitted={feedbackSubmitted} /> : null}
       {activeTab === "coverLetter" ? <CoverLetterPage result={result} isComplete={isComplete} profile={profile} /> : null}
     </div>
