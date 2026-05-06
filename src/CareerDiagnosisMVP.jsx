@@ -26,6 +26,7 @@ import {
   updateDiagnosisAfterQuestions,
   updateDiagnosisProfile,
 } from "./lib/saveDiagnosis.js";
+import { callCareerAi } from "./lib/careerAiApi.js";
 
 function phase2SessionKey(submissionId) {
   return `mvp_diag_phase2_${submissionId}`;
@@ -171,6 +172,40 @@ function DiagnosisPage({ answers, setAnswers, result, isComplete, switchTab, pro
   });
   const setAnswer = (id, value) => setAnswers((prev) => ({ ...prev, [id]: value }));
 
+  const [aiInsight, setAiInsight] = useState(null);
+  const [aiInsightLoading, setAiInsightLoading] = useState(false);
+  const [aiInsightError, setAiInsightError] = useState("");
+
+  const fetchAiInsight = async () => {
+    setAiInsightLoading(true);
+    setAiInsightError("");
+    try {
+      const payload = {
+        summary: result.summary,
+        level: result.level,
+        topRIASEC: result.topRIASEC,
+        topPersonality: result.topPersonality,
+        topAptitude: result.topAptitude,
+        maturityAvg: result.maturityAvg,
+        readinessAvg: result.readinessAvg,
+        jobs: result.jobs,
+        profile: {
+          name: profile.value.name,
+          status: profile.value.status,
+          school: profile.value.school,
+          major: profile.value.major,
+          targetJob: profile.value.targetJob,
+        },
+      };
+      const data = await callCareerAi("diagnosis_insight", payload);
+      setAiInsight(data);
+    } catch (err) {
+      setAiInsightError(err.message || String(err));
+    } finally {
+      setAiInsightLoading(false);
+    }
+  };
+
   const movePage = (nextPage) => {
     setCurrentPage(Math.max(0, Math.min(pages.length - 1, nextPage)));
     setTimeout(() => questionTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
@@ -274,6 +309,40 @@ function DiagnosisPage({ answers, setAnswers, result, isComplete, switchTab, pro
               <div className="rounded-3xl bg-slate-900 p-6 text-white">
                 <p className="text-sm font-bold text-slate-300">나의 커리어 요약</p>
                 <p className="mt-3 text-lg font-semibold leading-8">{result.summary}</p>
+              </div>
+              <div className="rounded-3xl border border-violet-200 bg-violet-50/90 p-6 ring-1 ring-violet-100">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-black text-violet-900">AI 진단 해설</p>
+                    <p className="mt-1 text-sm leading-6 text-violet-800">점수와 성향을 쉬운 말로 풀어 드리고, 다음에 무엇을 하면 좋을지 짚어 드립니다.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchAiInsight}
+                    disabled={aiInsightLoading}
+                    className="shrink-0 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-violet-300"
+                  >
+                    {aiInsightLoading ? "생성 중…" : aiInsight ? "다시 받기" : "AI 해설 받기"}
+                  </button>
+                </div>
+                {aiInsightError ? <p className="mt-3 text-sm leading-6 text-rose-700">{aiInsightError}</p> : null}
+                {aiInsight?.interpretation ? (
+                  <>
+                    <p className="mt-4 whitespace-pre-line text-sm leading-7 text-violet-950">{aiInsight.interpretation}</p>
+                    {Array.isArray(aiInsight.tips) && aiInsight.tips.length > 0 ? (
+                      <ul className="mt-4 space-y-2">
+                        {aiInsight.tips.map((t) => (
+                          <li key={t} className="rounded-2xl bg-white/90 px-4 py-3 text-sm leading-6 text-violet-950 ring-1 ring-violet-100">
+                            • {t}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </>
+                ) : null}
+                <p className="mt-3 text-xs leading-5 text-violet-700/90">
+                  AI 기능은 서버에 OPENAI_API_KEY가 설정된 배포 환경에서 동작합니다. 로컬 전체 테스트 시에는 Vercel 개발 모드로 프론트와 API를 함께 실행하세요.
+                </p>
               </div>
               <div className="grid gap-5 xl:grid-cols-3">
                 <div className="rounded-3xl border border-slate-200 p-5">
@@ -460,6 +529,30 @@ function FeedbackSurveyPage({
 function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmitted }) {
   const report = useMemo(() => normalizeReportLanguage(generatedReport), [generatedReport]);
   const [isSavingPdf, setIsSavingPdf] = useState(false);
+  const [aiCoach, setAiCoach] = useState(null);
+  const [aiCoachLoading, setAiCoachLoading] = useState(false);
+  const [aiCoachError, setAiCoachError] = useState("");
+
+  const fetchAiCoach = async () => {
+    if (!report) return;
+    setAiCoachLoading(true);
+    setAiCoachError("");
+    try {
+      const data = await callCareerAi("report_coach", {
+        title: report.title,
+        summary: report.summary,
+        stage: report.stage,
+        strengths: report.strengths,
+        actionPlan: report.actionPlan,
+        participant: report.participant,
+      });
+      setAiCoach(data);
+    } catch (err) {
+      setAiCoachError(err.message || String(err));
+    } finally {
+      setAiCoachLoading(false);
+    }
+  };
 
   const handlePrintReport = async () => {
     if (!report) return;
@@ -505,7 +598,7 @@ function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmi
       appendCanvasToPdfMm(canvas, pdf, 8);
 
       const safeName = (report.participant?.name || "career-report").replace(/[^가-힣a-zA-Z0-9_-]/g, "_");
-      pdf.save(`${safeName}_커리어_상세리포트.pdf`);
+      pdf.save(`${safeName}_커리어_베이직리포트.pdf`);
     } catch (error) {
       console.error(error);
       alert("PDF 생성 중 오류가 발생했습니다. html2canvas·jsPDF 로그를 확인해주세요. 대안으로 브라우저 인쇄 기능을 실행합니다.");
@@ -552,6 +645,47 @@ function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmi
               </button>
             </div>
             <p className="mt-4 leading-7 text-slate-700">{report.summary}</p>
+
+            <div className="mt-5 rounded-3xl border border-violet-200 bg-violet-50/90 p-6 ring-1 ring-violet-100">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-black text-violet-900">AI 리포트 코칭</p>
+                  <p className="mt-1 text-sm leading-6 text-violet-800">베이직 리포트 내용을 바탕으로 지원·면접 준비 관점에서 코칭을 덧붙입니다.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchAiCoach}
+                  disabled={aiCoachLoading}
+                  className="shrink-0 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-violet-300"
+                >
+                  {aiCoachLoading ? "생성 중…" : aiCoach ? "AI 다시 받기" : "AI 코칭 받기"}
+                </button>
+              </div>
+              {aiCoachError ? <p className="mt-3 text-sm leading-6 text-rose-700">{aiCoachError}</p> : null}
+              {aiCoach ? (
+                <div className="mt-4 space-y-4">
+                  <p className="whitespace-pre-line text-sm leading-7 text-violet-950">{aiCoach.openingReflection}</p>
+                  {Array.isArray(aiCoach.emphasisForApplications) && aiCoach.emphasisForApplications.length > 0 ? (
+                    <div>
+                      <p className="text-sm font-black text-violet-900">지원 시 강조하면 좋은 점</p>
+                      <ul className="mt-2 space-y-2">
+                        {aiCoach.emphasisForApplications.map((t) => (
+                          <li key={t} className="rounded-2xl bg-white/90 px-4 py-3 text-sm text-violet-950 ring-1 ring-violet-100">
+                            • {t}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {aiCoach.oneWeekFocus ? (
+                    <div>
+                      <p className="text-sm font-black text-violet-900">이번 주 집중하면 좋은 일</p>
+                      <p className="mt-2 whitespace-pre-line text-sm leading-7 text-violet-950">{aiCoach.oneWeekFocus}</p>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </section>
 
           <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
@@ -663,6 +797,33 @@ function CoverLetterPage({ result, isComplete, profile }) {
   const completedReviews = reviews.filter((item) => item.review);
   const averageScore = completedReviews.length ? Math.round(completedReviews.reduce((sum, item) => sum + item.review.total, 0) / completedReviews.length) : null;
   const totalLength = coverLetter.items.reduce((sum, item) => sum + item.answer.trim().length, 0);
+
+  const [aiByItem, setAiByItem] = useState({});
+
+  const runAiCover = async (itemId) => {
+    const row = coverLetter.items.find((x) => x.id === itemId);
+    if (!row?.answer?.trim()) return;
+    setAiByItem((prev) => ({ ...prev, [itemId]: { loading: true, error: "" } }));
+    try {
+      const rev = buildCoverLetterReview(row, coverLetter.company, coverLetter.job, result, isComplete);
+      const ruleHint = rev ? `규칙 기반 총점 ${rev.total}. 보완: ${rev.improvements.join("; ") || "없음"}` : "";
+      const diagnosisHint =
+        isComplete && result.topRIASEC?.length > 0
+          ? `진단 상위 관심유형: ${result.topRIASEC.map(([k]) => riasecLabels[k]?.name).filter(Boolean).join(", ")}`
+          : "";
+      const data = await callCareerAi("cover_letter", {
+        company: coverLetter.company,
+        job: coverLetter.job,
+        question: row.question,
+        answer: row.answer,
+        ruleBasedHint: ruleHint,
+        diagnosisHint,
+      });
+      setAiByItem((prev) => ({ ...prev, [itemId]: { loading: false, data } }));
+    } catch (err) {
+      setAiByItem((prev) => ({ ...prev, [itemId]: { loading: false, error: err.message || String(err) } }));
+    }
+  };
 
   return (
     <main className="mx-auto grid max-w-7xl gap-6 px-5 py-8 lg:grid-cols-[420px_1fr]">
@@ -793,6 +954,60 @@ function CoverLetterPage({ result, isComplete, profile }) {
                       <h4 className="font-black">문장 수정 예시</h4>
                       <div className="mt-4 whitespace-pre-line rounded-2xl bg-slate-900 p-5 text-sm leading-7 text-white">{currentReview.sampleDraft}</div>
                     </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-violet-200 bg-violet-50/90 p-6 ring-1 ring-violet-100">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-sm font-black text-violet-900">GPT 첨삭</p>
+                        <p className="mt-1 text-sm leading-6 text-violet-800">위 규칙 기반 첨삭에 더해 문단 단위 코멘트와 수정 예시를 받을 수 있습니다.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => runAiCover(item.id)}
+                        disabled={Boolean(aiByItem[item.id]?.loading)}
+                        className="shrink-0 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-violet-300"
+                      >
+                        {aiByItem[item.id]?.loading ? "생성 중…" : aiByItem[item.id]?.data ? "GPT 다시 받기" : "GPT 첨삭 받기"}
+                      </button>
+                    </div>
+                    {aiByItem[item.id]?.error ? <p className="mt-3 text-sm leading-6 text-rose-700">{aiByItem[item.id].error}</p> : null}
+                    {aiByItem[item.id]?.data ? (
+                      <div className="mt-4 space-y-4">
+                        <p className="text-sm font-bold text-violet-900">총평</p>
+                        <p className="text-sm leading-7 text-violet-950">{aiByItem[item.id].data.overallFeedback}</p>
+                        {Array.isArray(aiByItem[item.id].data.strengths) && aiByItem[item.id].data.strengths.length > 0 ? (
+                          <div>
+                            <p className="text-sm font-bold text-violet-900">강점</p>
+                            <ul className="mt-2 space-y-2">
+                              {aiByItem[item.id].data.strengths.map((t) => (
+                                <li key={t} className="rounded-2xl bg-white/90 px-4 py-3 text-sm text-violet-950 ring-1 ring-violet-100">
+                                  • {t}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {Array.isArray(aiByItem[item.id].data.improvements) && aiByItem[item.id].data.improvements.length > 0 ? (
+                          <div>
+                            <p className="text-sm font-bold text-violet-900">보완</p>
+                            <ul className="mt-2 space-y-2">
+                              {aiByItem[item.id].data.improvements.map((t) => (
+                                <li key={t} className="rounded-2xl bg-white/90 px-4 py-3 text-sm text-violet-950 ring-1 ring-violet-100">
+                                  • {t}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {aiByItem[item.id].data.revisedSample ? (
+                          <div>
+                            <p className="text-sm font-bold text-violet-900">수정 예시 문단</p>
+                            <div className="mt-2 whitespace-pre-line rounded-2xl bg-white/95 p-4 text-sm leading-7 text-violet-950 ring-1 ring-violet-100">{aiByItem[item.id].data.revisedSample}</div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               )}
@@ -927,7 +1142,7 @@ export default function CareerDiagnosisMVP() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-xl font-black tracking-tight">AI 커리어 프로파일 진단 MVP</h1>
-            <p className="mt-1 text-sm text-slate-500">개인정보 입력 · 검사별 5문항 진단 · 후기 조사 후 베이직 리포트 · 자기소개서 4문항 첨삭</p>
+            <p className="mt-1 text-sm text-slate-500">개인정보 입력 · 검사별 5문항 진단 · 후기 조사 후 베이직 리포트 · 자기소개서 첨삭(GPT 선택)</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => switchTab("diagnosis")} className={`rounded-2xl px-4 py-2 text-sm font-black transition ${activeTab === "diagnosis" ? "bg-slate-900 text-white shadow-sm" : "border border-slate-200 bg-white hover:bg-slate-100"}`}>
