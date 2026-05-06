@@ -27,6 +27,7 @@ import {
   updateDiagnosisProfile,
 } from "./lib/saveDiagnosis.js";
 import { buildReportCoachPayload, callCareerAi, fetchReportCoachSafe } from "./lib/careerAiApi.js";
+import { callCareerAI } from "./lib/ai.js";
 
 function phase2SessionKey(submissionId) {
   return `mvp_diag_phase2_${submissionId}`;
@@ -155,7 +156,24 @@ function ProfileSummary({ profile, onEdit }) {
   );
 }
 
-function DiagnosisPage({ answers, setAnswers, result, isComplete, switchTab, profile, profileReady, setProfileReady, setGeneratedReport, feedback, onStartDiagnosis, startBusy }) {
+function DiagnosisPage({
+  answers,
+  setAnswers,
+  result,
+  isComplete,
+  switchTab,
+  profile,
+  profileReady,
+  setProfileReady,
+  setGeneratedReport,
+  feedback,
+  onStartDiagnosis,
+  startBusy,
+  aiDiagnosis,
+  setAiDiagnosis,
+  aiLoading,
+  setAiLoading,
+}) {
   const pages = useMemo(() => buildDiagnosisPages(), []);
   const [currentPage, setCurrentPage] = useState(0);
   const questionTopRef = useRef(null);
@@ -172,37 +190,24 @@ function DiagnosisPage({ answers, setAnswers, result, isComplete, switchTab, pro
   });
   const setAnswer = (id, value) => setAnswers((prev) => ({ ...prev, [id]: value }));
 
-  const [aiInsight, setAiInsight] = useState(null);
-  const [aiInsightLoading, setAiInsightLoading] = useState(false);
   const [aiInsightError, setAiInsightError] = useState("");
 
   const fetchAiInsight = async () => {
-    setAiInsightLoading(true);
+    if (!isComplete) return;
     setAiInsightError("");
     try {
-      const payload = {
-        summary: result.summary,
-        level: result.level,
-        topRIASEC: result.topRIASEC,
-        topPersonality: result.topPersonality,
-        topAptitude: result.topAptitude,
-        maturityAvg: result.maturityAvg,
-        readinessAvg: result.readinessAvg,
-        jobs: result.jobs,
-        profile: {
-          name: profile.value.name,
-          status: profile.value.status,
-          school: profile.value.school,
-          major: profile.value.major,
-          targetJob: profile.value.targetJob,
-        },
-      };
-      const data = await callCareerAi("diagnosis_insight", payload);
-      setAiInsight(data);
+      setAiLoading(true);
+      const aiResult = await callCareerAI({
+        mode: "diagnosis",
+        profile: profile.value,
+        answers,
+        result,
+      });
+      setAiDiagnosis(aiResult.data || aiResult.raw);
     } catch (err) {
       setAiInsightError(err.message || String(err));
     } finally {
-      setAiInsightLoading(false);
+      setAiLoading(false);
     }
   };
 
@@ -319,19 +324,22 @@ function DiagnosisPage({ answers, setAnswers, result, isComplete, switchTab, pro
                   <button
                     type="button"
                     onClick={fetchAiInsight}
-                    disabled={aiInsightLoading}
+                    disabled={aiLoading}
                     className="shrink-0 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-violet-300"
                   >
-                    {aiInsightLoading ? "생성 중…" : aiInsight ? "다시 받기" : "AI 해설 받기"}
+                    {aiLoading ? "생성 중…" : aiDiagnosis ? "다시 받기" : "AI 진단 결과 생성하기"}
                   </button>
                 </div>
                 {aiInsightError ? <p className="mt-3 text-sm leading-6 text-rose-700">{aiInsightError}</p> : null}
-                {aiInsight?.interpretation ? (
+                {typeof aiDiagnosis === "string" ? (
+                  <p className="mt-4 whitespace-pre-line text-sm leading-7 text-violet-950">{aiDiagnosis}</p>
+                ) : null}
+                {aiDiagnosis?.interpretation ? (
                   <>
-                    <p className="mt-4 whitespace-pre-line text-sm leading-7 text-violet-950">{aiInsight.interpretation}</p>
-                    {Array.isArray(aiInsight.tips) && aiInsight.tips.length > 0 ? (
+                    <p className="mt-4 whitespace-pre-line text-sm leading-7 text-violet-950">{aiDiagnosis.interpretation}</p>
+                    {Array.isArray(aiDiagnosis.tips) && aiDiagnosis.tips.length > 0 ? (
                       <ul className="mt-4 space-y-2">
-                        {aiInsight.tips.map((t) => (
+                        {aiDiagnosis.tips.map((t) => (
                           <li key={t} className="rounded-2xl bg-white/90 px-4 py-3 text-sm leading-6 text-violet-950 ring-1 ring-violet-100">
                             • {t}
                           </li>
@@ -1047,6 +1055,8 @@ export default function CareerDiagnosisMVP() {
   const [answers, setAnswers] = useState({});
   const [activeTab, setActiveTab] = useState("diagnosis");
   const [generatedReport, setGeneratedReport] = useState(null);
+  const [aiDiagnosis, setAiDiagnosis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const [feedback, setFeedback] = useState(emptyFeedback);
   const [profile, setProfile] = useState(emptyProfile);
   const [profileReady, setProfileReady] = useState(false);
@@ -1154,6 +1164,8 @@ export default function CareerDiagnosisMVP() {
     setSubmissionId(null);
     setAnswers({});
     setGeneratedReport(null);
+    setAiDiagnosis(null);
+    setAiLoading(false);
     setFeedback(emptyFeedback);
     setProfile(emptyProfile);
     setProfileReady(false);
@@ -1199,6 +1211,10 @@ export default function CareerDiagnosisMVP() {
           feedback={feedback}
           onStartDiagnosis={handleStartDiagnosis}
           startBusy={startBusy}
+          aiDiagnosis={aiDiagnosis}
+          setAiDiagnosis={setAiDiagnosis}
+          aiLoading={aiLoading}
+          setAiLoading={setAiLoading}
         />
       ) : null}
       {activeTab === "feedback" ? (
