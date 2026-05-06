@@ -202,7 +202,7 @@ function DetailedReportSection({ dr }) {
   if (!dr || typeof dr !== "object" || Object.keys(dr).length === 0) {
     return (
       <section className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-6 text-center text-sm text-slate-500">
-        상세 리포트 JSON 이 비어 있습니다.
+        베이직 리포트 JSON 이 비어 있습니다.
       </section>
     );
   }
@@ -211,7 +211,7 @@ function DetailedReportSection({ dr }) {
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-900 to-violet-800 px-5 py-4 text-white">
         <p className="text-[11px] font-bold uppercase tracking-widest text-indigo-200">SECTION 02</p>
-        <h3 className="mt-1 text-lg font-black">커리어 상세 리포트</h3>
+        <h3 className="mt-1 text-lg font-black">커리어 베이직 리포트</h3>
         {dr.createdAt ? <p className="mt-1 text-xs text-indigo-100">생성일 {dr.createdAt}</p> : null}
       </div>
       <div className="space-y-5 p-5">

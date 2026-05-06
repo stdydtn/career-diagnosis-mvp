@@ -318,13 +318,13 @@ function DiagnosisPage({ answers, setAnswers, result, isComplete, switchTab, pro
                     }}
                     className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-sm"
                   >
-                    상세 리포트 보기
+                    베이직 리포트 보기
                   </button>
                   <button type="button" onClick={() => switchTab("coverLetter")} className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black shadow-sm hover:bg-slate-100">
                     자기소개서 첨삭하기
                   </button>
                 </div>
-                <p className="mt-3 text-sm leading-6 text-slate-500">상세 리포트는 바로 확인할 수 있으며, PDF 저장은 MVP 사용 후기 조사 후 가능합니다.</p>
+                <p className="mt-3 text-sm leading-6 text-slate-500">베이직 리포트는 바로 확인할 수 있으며, PDF 저장은 MVP 사용 후기 조사 후 가능합니다.</p>
               </div>
             </div>
           )}
@@ -403,8 +403,8 @@ function FeedbackSurveyPage({
     return (
       <main className="mx-auto max-w-5xl px-5 py-8">
         <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-          <h2 className="text-2xl font-black">진단 완료 후 상세 리포트를 볼 수 있습니다</h2>
-          <p className="mt-3 leading-7 text-slate-600">상세 리포트는 전체 진단을 완료하고 MVP 사용 후기 조사를 제출한 뒤 확인할 수 있습니다.</p>
+          <h2 className="text-2xl font-black">진단 완료 후 베이직 리포트를 볼 수 있습니다</h2>
+          <p className="mt-3 leading-7 text-slate-600">베이직 리포트는 전체 진단을 완료하고 MVP 사용 후기 조사를 제출한 뒤 확인할 수 있습니다.</p>
           <button type="button" onClick={() => switchTab("diagnosis")} className="mt-5 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-sm">
             진단 완료하러 가기
           </button>
@@ -446,7 +446,7 @@ function FeedbackSurveyPage({
         </label>
 
         <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm leading-6 text-slate-500">* 표시 항목을 입력하면 상세 리포트를 생성할 수 있습니다.</p>
+          <p className="text-sm leading-6 text-slate-500">* 표시 항목을 입력하면 베이직 리포트를 생성할 수 있습니다.</p>
           <button type="button" onClick={submitSurvey} disabled={!canSubmit} className="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
             후기 제출하고 PDF 저장하러 가기
           </button>
@@ -519,17 +519,17 @@ function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmi
       <style>{`@media print { header, button { display: none !important; } body { background: white !important; } main { max-width: none !important; padding: 0 !important; } #career-report-print-area { display: block !important; } }`}</style>
       <section className="rounded-3xl bg-slate-900 p-8 text-white shadow-sm">
         <p className="text-sm font-bold text-slate-300">BASIC CAREER REPORT</p>
-        <h2 className="mt-2 text-3xl font-black tracking-tight">베이직 상세 리포트</h2>
+        <h2 className="mt-2 text-3xl font-black tracking-tight">베이직 리포트</h2>
         <p className="mt-4 max-w-3xl leading-7 text-slate-200">후기 조사를 제출한 뒤 자동 생성되는 개인 맞춤 커리어 리포트입니다.</p>
       </section>
 
       {!report ? (
         <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-          <h3 className="text-xl font-black">아직 생성된 상세 리포트가 없습니다</h3>
-          <p className="mt-3 leading-7 text-slate-600">진단 결과 화면에서 상세 리포트 보기 버튼을 누르고 MVP 사용 후기 조사를 제출하면 검사 결과를 기반으로 상세 리포트가 자동 생성됩니다.</p>
+          <h3 className="text-xl font-black">아직 생성된 베이직 리포트가 없습니다</h3>
+          <p className="mt-3 leading-7 text-slate-600">진단 결과 화면에서 베이직 리포트 보기 버튼을 누르고 MVP 사용 후기 조사를 제출하면 검사 결과를 기반으로 베이직 리포트가 자동 생성됩니다.</p>
           <div className="mt-5 flex flex-wrap gap-2">
             <button type="button" onClick={() => switchTab("diagnosis")} className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-sm">
-              진단 결과에서 상세 리포트 생성하기
+              진단 결과에서 베이직 리포트 생성하기
             </button>
             {!isComplete ? (
               <button type="button" onClick={() => switchTab("diagnosis")} className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black shadow-sm hover:bg-slate-100">
@@ -618,6 +618,19 @@ function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmi
               ))}
             </ol>
           </section>
+
+          {Array.isArray(report.weeklyChecklist) && report.weeklyChecklist.length > 0 ? (
+            <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+              <h3 className="text-xl font-black">6. 이번주 취업준비 체크리스트</h3>
+              <ul className="mt-4 space-y-3">
+                {report.weeklyChecklist.map((item, index) => (
+                  <li key={`check-${index}`} className="rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-950 ring-1 ring-amber-100">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
       )}
     </main>
@@ -913,7 +926,7 @@ export default function CareerDiagnosisMVP() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-xl font-black tracking-tight">AI 커리어 프로파일 진단 MVP</h1>
-            <p className="mt-1 text-sm text-slate-500">개인정보 입력 · 검사별 5문항 진단 · 후기 조사 후 상세 리포트 · 자기소개서 4문항 첨삭</p>
+            <p className="mt-1 text-sm text-slate-500">개인정보 입력 · 검사별 5문항 진단 · 후기 조사 후 베이직 리포트 · 자기소개서 4문항 첨삭</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => switchTab("diagnosis")} className={`rounded-2xl px-4 py-2 text-sm font-black transition ${activeTab === "diagnosis" ? "bg-slate-900 text-white shadow-sm" : "border border-slate-200 bg-white hover:bg-slate-100"}`}>

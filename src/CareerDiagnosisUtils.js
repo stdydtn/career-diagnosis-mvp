@@ -102,6 +102,34 @@ function buildRecommendedJobEntries(jobs) {
   }));
 }
 
+function buildWeeklyChecklist(level, topJobTitle, profile) {
+  const isExplore = level?.label === "탐색 우선형";
+  const isDirection = level?.label === "방향 설정형";
+  const jobText = topJobTitle || profile?.targetJob || "희망 직무";
+  if (isExplore) {
+    return [
+      `[ ] ${jobText} 포함 관심 직무 3개를 정하고, 각 직무 공고 2개씩 저장하기`,
+      "[ ] 공고에서 반복되는 요구역량 키워드 8~10개 추려서 노트에 정리하기",
+      "[ ] 내 경험 5개를 나열하고 각 경험의 역할·결과를 한 줄씩 적기",
+      "[ ] 이번주 안에 현직자 인터뷰/유튜브/직무 콘텐츠 2개 이상 보기",
+    ];
+  }
+  if (isDirection) {
+    return [
+      `[ ] ${jobText} 공고 5개를 분석해 공통 역량 키워드 Top 5 확정하기`,
+      "[ ] STAR 경험 3개 완성하기(상황·과제·행동·결과)",
+      "[ ] 이력서 상단에 직무 맞춤 한 줄 요약 추가하기",
+      "[ ] 자소서 1개 문항을 직무 키워드 기준으로 다시 써보기",
+    ];
+  }
+  return [
+    `[ ] ${jobText} 중심으로 이번주 지원할 회사 3곳 선정하기`,
+    "[ ] 회사별 지원 동기 문단 3개 버전 만들어 두기",
+    "[ ] 예상 면접 질문 5개에 대해 30초/1분 답변 녹음하기",
+    "[ ] 제출 이력(공고 링크, 제출일, 결과)을 한 장 시트로 관리 시작하기",
+  ];
+}
+
 export function recommendedJobTitle(job) {
   if (job == null) return "";
   return typeof job === "string" ? job : job.title ?? "";
@@ -115,12 +143,13 @@ export function createDetailedReport(result, profile, feedback) {
   const topAptitude = result.topAptitude[0]?.[0] || "문제해결";
   const code = [topInterest, secondInterest, thirdInterest].join("");
   const jobs = result.jobs.length ? result.jobs : jobMap[topInterest];
+  const recommendedJobs = buildRecommendedJobEntries(jobs);
   const namePrefix = profile.name ? `${profile.name}님, ` : "";
 
   return {
     createdAt: new Date().toLocaleDateString("ko-KR"),
     code,
-    title: `${riasecLabels[topInterest].name} 성향이 강한 커리어 상세 리포트`,
+    title: `${riasecLabels[topInterest].name} 성향이 강한 커리어 베이직 리포트`,
     participant: profile,
     feedback,
     summary: `${namePrefix}검사에서는 ${riasecLabels[topInterest].name} 성향이 가장 두드러지고, ${riasecLabels[secondInterest].name}·${riasecLabels[thirdInterest].name} 성향이 함께 보이는 편이에요. 취업 준비에서는 '어떤 일을 좋아하는지'만큼 '어떤 방식으로 일할 때 강해지는지'를 서류·면접에서 같은 언어로 맞춰 주면 좋습니다.`,
@@ -131,7 +160,7 @@ export function createDetailedReport(result, profile, feedback) {
     ].join("\n\n"),
     strengths: buildStrengthItems(topInterest, topPersonality, topAptitude),
     stage: formatStageBlock(result.level),
-    recommendedJobs: buildRecommendedJobEntries(jobs),
+    recommendedJobs,
     actionPlan: [
       "추천 직무 TOP 5 중 이번 시즌에 파고들 1~2개만 정하고, 직무별 채용공고를 최소 5개씩 스크랩하세요. 공통으로 나오는 요구역량 키워드를 노트에 모아 두면 그게 곧 자소서 목차가 됩니다.",
       "경험을 STAR(상황·과제·행동·결과) 한 세트로 3개만 완성하세요. 숫자가 없으면 기간·참여 인원·완료 여부처럼 적어도 되는 단위부터 채워 넣어 보세요.",
@@ -140,6 +169,7 @@ export function createDetailedReport(result, profile, feedback) {
       "면접 전 '왜 이 직무인가'와 '왜 이 회사인가'를 각각 30초 버전으로 말해 보고, 녹음해서 어색한 표현만 고쳐도 실전감이 확 올라갑니다.",
       "탈락·무응답이 나와도 지원한 공고 링크와 제출한 파일 날짜를 한 줄씩만 기록해 두세요. 다음 수정 포인트를 찾기 쉬워집니다.",
     ],
+    weeklyChecklist: buildWeeklyChecklist(result.level, recommendedJobTitle(recommendedJobs[0]), profile),
   };
 }
 
@@ -179,6 +209,11 @@ export function buildPlainTextReport(report) {
   lines.push("");
   lines.push("[다음 실행전략]");
   report.actionPlan.forEach((item, index) => lines.push(`${index + 1}. ${item}`));
+  if (Array.isArray(report.weeklyChecklist) && report.weeklyChecklist.length > 0) {
+    lines.push("");
+    lines.push("[이번주 취업준비 체크리스트]");
+    report.weeklyChecklist.forEach((item, index) => lines.push(`${index + 1}. ${item}`));
+  }
   return lines;
 }
 
