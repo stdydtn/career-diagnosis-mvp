@@ -16,6 +16,7 @@ import {
   computeScores,
   createDetailedReport,
   getReadinessLevel,
+  normalizeReportLanguage,
   pct,
   topEntries,
 } from "./CareerDiagnosisUtils.js";
@@ -457,7 +458,7 @@ function FeedbackSurveyPage({
 }
 
 function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmitted }) {
-  const report = generatedReport;
+  const report = useMemo(() => normalizeReportLanguage(generatedReport), [generatedReport]);
   const [isSavingPdf, setIsSavingPdf] = useState(false);
 
   const handlePrintReport = async () => {

@@ -135,6 +135,40 @@ export function recommendedJobTitle(job) {
   return typeof job === "string" ? job : job.title ?? "";
 }
 
+function replaceLegacyTerms(text) {
+  if (typeof text !== "string") return text;
+  return text
+    .replace(/STAR\(상황·과제·행동·결과\)/g, "상황 → 내가 한 일 → 결과")
+    .replace(/STAR 경험/g, "핵심 경험")
+    .replace(/탈락·무응답/g, "원하는 결과가 아니었을 때");
+}
+
+export function normalizeReportLanguage(report) {
+  if (!report || typeof report !== "object") return report;
+  const normalizedJobs = Array.isArray(report.recommendedJobs)
+    ? report.recommendedJobs.map((job) => {
+        if (typeof job === "string") return replaceLegacyTerms(job);
+        if (!job || typeof job !== "object") return job;
+        return {
+          ...job,
+          title: replaceLegacyTerms(job.title),
+          tip: replaceLegacyTerms(job.tip),
+        };
+      })
+    : report.recommendedJobs;
+
+  return {
+    ...report,
+    summary: replaceLegacyTerms(report.summary),
+    profileText: replaceLegacyTerms(report.profileText),
+    stage: replaceLegacyTerms(report.stage),
+    strengths: Array.isArray(report.strengths) ? report.strengths.map(replaceLegacyTerms) : report.strengths,
+    actionPlan: Array.isArray(report.actionPlan) ? report.actionPlan.map(replaceLegacyTerms) : report.actionPlan,
+    weeklyChecklist: Array.isArray(report.weeklyChecklist) ? report.weeklyChecklist.map(replaceLegacyTerms) : report.weeklyChecklist,
+    recommendedJobs: normalizedJobs,
+  };
+}
+
 export function createDetailedReport(result, profile, feedback) {
   const topInterest = result.topRIASEC[0]?.[0] || "S";
   const secondInterest = result.topRIASEC[1]?.[0] || "E";

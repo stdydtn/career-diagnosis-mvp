@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { questions, riasecLabels, personalityLabels, aptitudeLabels } from "./CareerDiagnosisData.js";
+import { normalizeReportLanguage } from "./CareerDiagnosisUtils.js";
 import { supabase } from "./lib/supabase.js";
 
 const SESSION_KEY = "mvp_diagnosis_admin_unlock";
@@ -199,7 +200,8 @@ function AnswersReportSection({ answers }) {
 }
 
 function DetailedReportSection({ dr }) {
-  if (!dr || typeof dr !== "object" || Object.keys(dr).length === 0) {
+  const safeDr = normalizeReportLanguage(dr);
+  if (!safeDr || typeof safeDr !== "object" || Object.keys(safeDr).length === 0) {
     return (
       <section className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-6 text-center text-sm text-slate-500">
         베이직 리포트 JSON 이 비어 있습니다.
@@ -212,39 +214,39 @@ function DetailedReportSection({ dr }) {
       <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-900 to-violet-800 px-5 py-4 text-white">
         <p className="text-[11px] font-bold uppercase tracking-widest text-indigo-200">SECTION 02</p>
         <h3 className="mt-1 text-lg font-black">커리어 베이직 리포트</h3>
-        {dr.createdAt ? <p className="mt-1 text-xs text-indigo-100">생성일 {dr.createdAt}</p> : null}
+        {safeDr.createdAt ? <p className="mt-1 text-xs text-indigo-100">생성일 {safeDr.createdAt}</p> : null}
       </div>
       <div className="space-y-5 p-5">
-        {dr.title ? (
+        {safeDr.title ? (
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">리포트 제목</p>
-            <p className="mt-1 text-xl font-black text-slate-900">{dr.title}</p>
-            {dr.code ? <p className="mt-2 inline-block rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-800 ring-1 ring-indigo-100">흥미 코드 {dr.code}</p> : null}
+            <p className="mt-1 text-xl font-black text-slate-900">{safeDr.title}</p>
+            {safeDr.code ? <p className="mt-2 inline-block rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-800 ring-1 ring-indigo-100">흥미 코드 {safeDr.code}</p> : null}
           </div>
         ) : null}
-        {dr.summary ? (
+        {safeDr.summary ? (
           <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50/40 p-5 ring-1 ring-slate-100">
             <p className="text-xs font-black text-indigo-700">한 줄 요약</p>
-            <p className="mt-2 text-sm leading-relaxed text-slate-800">{dr.summary}</p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-800">{safeDr.summary}</p>
           </div>
         ) : null}
-        {dr.profileText ? (
+        {safeDr.profileText ? (
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-slate-400">쉽게 보는 진로 성향</p>
-            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-700">{dr.profileText}</p>
+            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-700">{safeDr.profileText}</p>
           </div>
         ) : null}
-        {dr.stage ? (
+        {safeDr.stage ? (
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
             <p className="text-xs font-black text-emerald-800">준비 단계</p>
-            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-emerald-950">{dr.stage}</p>
+            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-emerald-950">{safeDr.stage}</p>
           </div>
         ) : null}
-        {Array.isArray(dr.strengths) && dr.strengths.length > 0 ? (
+        {Array.isArray(safeDr.strengths) && safeDr.strengths.length > 0 ? (
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-slate-400">핵심 강점</p>
             <ul className="mt-3 space-y-2">
-              {dr.strengths.map((t, i) => (
+              {safeDr.strengths.map((t, i) => (
                 <li key={`${i}-${t.slice(0, 24)}`} className="flex gap-3 rounded-2xl bg-white p-3 text-sm leading-relaxed text-slate-800 ring-1 ring-slate-100">
                   <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-400" />
                   {t}
@@ -253,11 +255,11 @@ function DetailedReportSection({ dr }) {
             </ul>
           </div>
         ) : null}
-        {Array.isArray(dr.recommendedJobs) && dr.recommendedJobs.length > 0 ? (
+        {Array.isArray(safeDr.recommendedJobs) && safeDr.recommendedJobs.length > 0 ? (
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-slate-400">추천 직무</p>
             <ul className="mt-3 space-y-2">
-              {dr.recommendedJobs.map((job, i) => {
+              {safeDr.recommendedJobs.map((job, i) => {
                 const title = typeof job === "string" ? job : job.title ?? "";
                 const tip = typeof job === "object" && job.tip ? job.tip : null;
                 return (
@@ -270,11 +272,11 @@ function DetailedReportSection({ dr }) {
             </ul>
           </div>
         ) : null}
-        {Array.isArray(dr.actionPlan) && dr.actionPlan.length > 0 ? (
+        {Array.isArray(safeDr.actionPlan) && safeDr.actionPlan.length > 0 ? (
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-slate-400">실행 전략</p>
             <ol className="mt-3 space-y-2">
-              {dr.actionPlan.map((t, i) => (
+              {safeDr.actionPlan.map((t, i) => (
                 <li key={`ap-${i}`} className="flex gap-3 rounded-2xl bg-indigo-50/80 p-3 text-sm leading-relaxed text-indigo-950 ring-1 ring-indigo-100">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-xs font-black text-white">{i + 1}</span>
                   {t}
