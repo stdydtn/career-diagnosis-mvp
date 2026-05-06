@@ -1,5 +1,5 @@
 /**
- * GPT 연동은 `/api/career-ai`(Vercel 서버리스)만 호출합니다. API 키는 브라우저에 두지 마세요.
+ * GPT 연동은 `/api/ai-career`(Vercel 서버리스)만 호출합니다. API 키는 브라우저에 두지 마세요.
  * 로컬에서 AI 테스트: 프로젝트 루트에서 `npx vercel dev` 후 동일 저장소에서 실행합니다.
  */
 
@@ -40,10 +40,11 @@ export async function fetchReportCoachSafe(report) {
 }
 
 export async function callCareerAi(action, payload) {
-  const res = await fetch("/api/career-ai", {
+  const requestBody = buildAiCareerRequest(action, payload);
+  const res = await fetch("/api/ai-career", {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: JSON.stringify({ action, payload }),
+    body: JSON.stringify(requestBody),
   });
 
   let body;
@@ -53,10 +54,45 @@ export async function callCareerAi(action, payload) {
     body = {};
   }
 
-  if (!res.ok || !body.ok) {
+  if (!res.ok || body.success === false) {
     const msg = body.message || body.error || `요청 실패 (${res.status})`;
     throw new Error(msg);
   }
 
-  return body.data;
+  if (body.data != null) return body.data;
+  if (body.raw != null) {
+    throw new Error("AI 응답이 JSON 형식이 아닙니다. 잠시 후 다시 시도해 주세요.");
+  }
+  throw new Error("AI 응답 데이터가 비어 있습니다.");
+}
+
+function buildAiCareerRequest(action, payload) {
+  if (action === "diagnosis_insight") {
+    return {
+      mode: "diagnosis",
+      profile: payload?.profile || {},
+      answers: payload?.answers || {},
+      result: payload || {},
+    };
+  }
+  if (action === "report_coach") {
+    return {
+      mode: "report",
+      profile: payload?.participant || {},
+      result: payload || {},
+      feedback: payload?.feedback || {},
+    };
+  }
+  if (action === "cover_letter") {
+    return {
+      mode: "coverLetter",
+      profile: payload?.profile || {},
+      result: payload?.result || {},
+      coverLetter: payload || {},
+    };
+  }
+  return {
+    mode: String(action || ""),
+    result: payload || {},
+  };
 }
