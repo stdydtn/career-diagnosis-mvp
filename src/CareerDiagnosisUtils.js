@@ -2,6 +2,7 @@ import {
   aptitudeLabels,
   easyInterestText,
   jobMap,
+  jobSeekerHints,
   personalityLabels,
   questions,
   riasecLabels,
@@ -30,13 +31,80 @@ export function topEntries(scores, count = 3) {
 }
 
 export function getReadinessLevel(maturityAvg, readinessAvg) {
-  if (maturityAvg < 3.2) return { label: "탐색 우선형", desc: "직업 선택 기준과 자기이해를 먼저 정리해야 하는 단계입니다." };
-  if (readinessAvg < 3.3) return { label: "방향 설정형", desc: "관심 직무는 어느 정도 잡혔으나 경험 정리와 지원 준비가 더 필요한 단계입니다." };
-  return { label: "실행 강화형", desc: "진로 방향과 준비행동이 비교적 갖춰져 있어 실전 지원 전략을 고도화할 단계입니다." };
+  if (maturityAvg < 3.2) {
+    return {
+      label: "탐색 우선형",
+      desc: "직무 정보와 나의 기준을 아직 맞춰 가야 하는 단계예요. 서류부터 채우기보다 방향을 좁히는 데 시간을 쓰면 이후 준비가 빨라집니다.",
+      studentVoice: "'뭘 지원해야 할지 모르겠다'는 느낌이 들 수 있는 구간이에요. 지원 횟수보다 정보와 자기 이해를 쌓는 쪽에 비중을 두면 좋습니다.",
+      bullets: [
+        "관심 산업·직무 후보를 3개만 적고, 각각 채용공고 2개씩만 읽으며 하는 일·자격 요건만 메모해 보세요.",
+        "프로젝트·알바·동아리 경험을 시간 순으로 적은 뒤, 각각에서 맡은 역할 한 줄·성과 한 줄만 추려 보세요.",
+        "혼자만의 노트로 '나에게 중요한 조건 3가지'(예: 사람 대하는 빈도, 분석 비중, 근무 형태)를 적어 두면 다음 선택이 쉬워져요.",
+      ],
+    };
+  }
+  if (readinessAvg < 3.3) {
+    return {
+      label: "방향 설정형",
+      desc: "대략의 방향은 잡혔지만 경험과 서류가 한 줄로 연결되지 않은 단계예요. 공고 언어로 경험을 번역하는 연습이 필요합니다.",
+      studentVoice: "'무엇을 지원할지는 대충 보이는데, 내 스펙으로 어떻게 말해야 할지 애매한' 상태에 가깝습니다.",
+      bullets: [
+        "희망 직무 채용공고 5개에서 반복되는 요구역량 키워드를 10개 이내로 모아, 내 경험과 짝지을 수 있는 것만 체크해 보세요.",
+        "STAR(상황·과제·행동·결과)로 경험 3개만 완성해 두면 자소서 문항 대부분을 재사용할 수 있어요.",
+        "이력서에는 직무와 무관한 나열 대신, 지원 직무에 붙일 한 줄 요약(예: ○○ 직무 지원 – 데이터 정리·발표 경험)을 달아 보세요.",
+      ],
+    };
+  }
+  return {
+    label: "실행 강화형",
+    desc: "진로 방향과 준비 행동이 어느 정도 정리되어 있어, 지원과 피드백으로 설득력을 올리면 되는 단계예요.",
+    studentVoice: "이제는 '무엇을 할지'보다 '어떻게 더 매력 있게 보여줄지'를 다듬는 시기에 가깝습니다.",
+    bullets: [
+      "회사·직무별로 자소서 일부만 바꿔도 합격 가능성이 달라집니다. 회사 미션·고객·서비스 관련 단어를 본문에 한 번 이상 넣어 보세요.",
+      "모의 면접이 부담되면 STAR 경험 3개를 친구에게 말로만 설명해 보고, 빠진 숫자·결과를 채워 넣으세요.",
+      "탈락·무응답이 나오면 서류·면접 중 어디가 애매했는지 한 줄씩만 기록해 두면 다음 지원에 바로 반영할 수 있어요.",
+    ],
+  };
 }
 
 export function includesAny(text, words) {
   return words.some((word) => text.includes(word));
+}
+
+function formatStageBlock(level) {
+  const bullets = Array.isArray(level.bullets) ? level.bullets : [];
+  return [
+    `지금은 '${level.label}' 단계에 가깝게 보입니다.`,
+    level.studentVoice || "",
+    level.desc || "",
+    "",
+    "▼ 이 단계에서 우선하면 좋은 준비",
+    ...bullets.map((b) => `• ${b}`),
+  ]
+    .join("\n")
+    .trim();
+}
+
+function buildStrengthItems(topInterest, topPersonality, topAptitude) {
+  const rName = riasecLabels[topInterest]?.name || "진로 성향";
+  return [
+    `【흥미·업무 스타일】 ${easyInterestText[topInterest]} 지원 동기·직무 이해 문항에는 '${rName}'에 맞는 일하는 방식(몰입하는 지점, 협업·독립 비중 등)을 한 문장으로 넣어 보세요.`,
+    `【성격】 ${personalityLabels[topPersonality]} 면접에서 협업·마감·갈등 상황 질문이 나오면, 그때의 행동을 이 성향과 연결해 말하면 답변이 한결 모여 들립니다.`,
+    `【역량】 ${aptitudeLabels[topAptitude]} 자소서·포트폴리오에는 문제 인식 → 내가 한 일 → 결과 순으로, 이 역량이 드러나는 사례 하나만 깊게 파는 편이 효과적이에요.`,
+  ];
+}
+
+function buildRecommendedJobEntries(jobs) {
+  const fallbackTip = "채용공고에서 반복되는 요구역량 키워드를 적어 두고, 내 경험을 그 단어로 번역해 보세요.";
+  return jobs.slice(0, 5).map((title) => ({
+    title,
+    tip: jobSeekerHints[title] || fallbackTip,
+  }));
+}
+
+export function recommendedJobTitle(job) {
+  if (job == null) return "";
+  return typeof job === "string" ? job : job.title ?? "";
 }
 
 export function createDetailedReport(result, profile, feedback) {
@@ -47,6 +115,7 @@ export function createDetailedReport(result, profile, feedback) {
   const topAptitude = result.topAptitude[0]?.[0] || "문제해결";
   const code = [topInterest, secondInterest, thirdInterest].join("");
   const jobs = result.jobs.length ? result.jobs : jobMap[topInterest];
+  const namePrefix = profile.name ? `${profile.name}님, ` : "";
 
   return {
     createdAt: new Date().toLocaleDateString("ko-KR"),
@@ -54,20 +123,22 @@ export function createDetailedReport(result, profile, feedback) {
     title: `${riasecLabels[topInterest].name} 성향이 강한 커리어 상세 리포트`,
     participant: profile,
     feedback,
-    summary: `${profile.name ? `${profile.name}님은 ` : ""}${easyInterestText[topInterest]} 특히 ${riasecLabels[secondInterest].name} 성향과 ${riasecLabels[thirdInterest].name} 성향도 함께 나타나므로, 직업을 선택할 때는 관심 있는 업무 내용뿐 아니라 일하는 방식과 환경까지 함께 고려하는 것이 좋습니다.`,
-    profileText: `검사 결과를 쉽게 정리하면, ${profile.name ? `${profile.name}님은 ` : "해당 사용자는 "}${riasecLabels[topInterest].name} 성향이 가장 높게 나타났습니다. ${easyInterestText[topInterest]} 함께 나타난 보조 성향은 ${riasecLabels[secondInterest].name}, ${riasecLabels[thirdInterest].name}입니다. 하나의 정답 직업을 찾기보다, 내가 좋아하는 일의 방식과 잘하는 업무 방식을 함께 고려해 직무를 선택하는 것이 좋습니다.`,
-    strengths: [
-      `일하는 방식의 강점: ${easyInterestText[topInterest]}`,
-      `성격적 강점: ${personalityLabels[topPersonality]}`,
-      `업무 역량 강점: ${aptitudeLabels[topAptitude]}`,
-    ],
-    stage: `현재 진로·취업 준비 단계는 '${result.level.label}'입니다. 쉽게 말해, ${result.level.desc}`,
-    recommendedJobs: jobs.slice(0, 5),
+    summary: `${namePrefix}검사에서는 ${riasecLabels[topInterest].name} 성향이 가장 두드러지고, ${riasecLabels[secondInterest].name}·${riasecLabels[thirdInterest].name} 성향이 함께 보이는 편이에요. 취업 준비에서는 '어떤 일을 좋아하는지'만큼 '어떤 방식으로 일할 때 강해지는지'를 서류·면접에서 같은 언어로 맞춰 주면 좋습니다.`,
+    profileText: [
+      `흥미 코드는 ${code} 순서(${riasecLabels[topInterest].name} → ${riasecLabels[secondInterest].name} → ${riasecLabels[thirdInterest].name})예요. 한마디로 하면 ${easyInterestText[topInterest]}`,
+      `정답 직무 하나를 찾기보다, 위 순서를 노트에 적어 두고 지원할 회사의 직무 소개·채용공고 문장과 비교해 보세요. 내 경험이 어떤 스타일의 업무에 가깝는지 스스로 번역하는 연습이 됩니다.`,
+      `자소서에서는 공고에 반복되는 동사·역량 단어(협업, 분석, 고객 응대 등)를 골라, 경험 문장을 그 단어로 시작하거나 마무리해 보세요. 면접에서는 같은 말을 30초·1분 버전으로 각각 말해 보는 연습만 해도 준비도가 확 달라져요.`,
+    ].join("\n\n"),
+    strengths: buildStrengthItems(topInterest, topPersonality, topAptitude),
+    stage: formatStageBlock(result.level),
+    recommendedJobs: buildRecommendedJobEntries(jobs),
     actionPlan: [
-      "추천 직무 5개 중 가장 관심 있는 직무 1~2개를 먼저 골라보세요.",
-      "선택한 직무의 채용공고를 3개 이상 확인하고 반복되는 요구역량을 정리하세요.",
-      "본인의 경험을 지원 직무와 연결해 자기소개서 소재로 정리하세요.",
-      "부족한 부분은 자격증, 프로젝트, 인턴, 포트폴리오 중 하나의 방식으로 보완하세요.",
+      "추천 직무 TOP 5 중 이번 시즌에 파고들 1~2개만 정하고, 직무별 채용공고를 최소 5개씩 스크랩하세요. 공통으로 나오는 요구역량 키워드를 노트에 모아 두면 그게 곧 자소서 목차가 됩니다.",
+      "경험을 STAR(상황·과제·행동·결과) 한 세트로 3개만 완성하세요. 숫자가 없으면 기간·참여 인원·완료 여부처럼 적어도 되는 단위부터 채워 넣어 보세요.",
+      "이력서 상단이나 자소서 첫 문단에 '지원 직무 + 내 역량 두 단어 + 대표 경험 한 줄' 구조로 요약 한 줄을 넣으면 서류 통과에 도움이 되는 경우가 많아요.",
+      "회사마다 자소서를 처음부터 다 쓰지 말고, 본문 뼈대는 재사용하고 지원 동기·회사 이해 문단만 바꾸는 방식으로 시간을 아끼세요.",
+      "면접 전 '왜 이 직무인가'와 '왜 이 회사인가'를 각각 30초 버전으로 말해 보고, 녹음해서 어색한 표현만 고쳐도 실전감이 확 올라갑니다.",
+      "탈락·무응답이 나와도 지원한 공고 링크와 제출한 파일 날짜를 한 줄씩만 기록해 두세요. 다음 수정 포인트를 찾기 쉬워집니다.",
     ],
   };
 }
@@ -100,7 +171,11 @@ export function buildPlainTextReport(report) {
   report.strengths.forEach((item, index) => lines.push(`${index + 1}. ${item}`));
   lines.push("");
   lines.push("[추천 직무 TOP 5]");
-  report.recommendedJobs.forEach((job, index) => lines.push(`${index + 1}. ${job}`));
+  report.recommendedJobs.forEach((job, index) => {
+    const title = recommendedJobTitle(job);
+    const tip = typeof job === "object" && job?.tip ? job.tip : "";
+    lines.push(`${index + 1}. ${title}${tip ? `\n   → ${tip}` : ""}`);
+  });
   lines.push("");
   lines.push("[다음 실행전략]");
   report.actionPlan.forEach((item, index) => lines.push(`${index + 1}. ${item}`));

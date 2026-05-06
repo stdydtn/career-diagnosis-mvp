@@ -570,11 +570,11 @@ function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmi
           <section className="grid gap-5 lg:grid-cols-2">
             <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
               <h3 className="text-xl font-black">1. 쉽게 보는 나의 진로 성향</h3>
-              <p className="mt-3 leading-7 text-slate-700">{report.profileText}</p>
+              <p className="mt-3 whitespace-pre-line leading-7 text-slate-700">{report.profileText}</p>
             </div>
             <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
               <h3 className="text-xl font-black">2. 진로·취업 준비 단계</h3>
-              <p className="mt-3 leading-7 text-slate-700">{report.stage}</p>
+              <p className="mt-3 whitespace-pre-line leading-7 text-slate-700">{report.stage}</p>
             </div>
           </section>
 
@@ -582,8 +582,8 @@ function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmi
             <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
               <h3 className="text-xl font-black">3. 나의 핵심 강점</h3>
               <div className="mt-4 space-y-3">
-                {report.strengths.map((item) => (
-                  <p key={item} className="rounded-2xl bg-emerald-50 p-4 text-sm leading-6 text-emerald-900 ring-1 ring-emerald-100">
+                {report.strengths.map((item, i) => (
+                  <p key={`strength-${i}`} className="rounded-2xl bg-emerald-50 p-4 text-sm leading-6 text-emerald-900 ring-1 ring-emerald-100">
                     {item}
                   </p>
                 ))}
@@ -592,11 +592,18 @@ function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmi
             <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
               <h3 className="text-xl font-black">4. 추천 직무 TOP 5</h3>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {report.recommendedJobs.slice(0, 5).map((job, index) => (
-                  <div key={job} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-bold ring-1 ring-slate-100">
-                    {index + 1}. {job}
-                  </div>
-                ))}
+                {report.recommendedJobs.slice(0, 5).map((job, index) => {
+                  const title = typeof job === "string" ? job : job.title;
+                  const tip = typeof job === "object" && job.tip ? job.tip : null;
+                  return (
+                    <div key={`${title}-${index}`} className="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                      <div className="text-sm font-bold">
+                        {index + 1}. {title}
+                      </div>
+                      {tip ? <p className="mt-2 text-xs leading-6 text-slate-600">{tip}</p> : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </section>
@@ -605,7 +612,7 @@ function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmi
             <h3 className="text-xl font-black">5. 다음 실행전략</h3>
             <ol className="mt-4 space-y-3">
               {report.actionPlan.map((item, index) => (
-                <li key={item} className="rounded-2xl bg-indigo-50 p-4 text-sm leading-6 text-indigo-950 ring-1 ring-indigo-100">
+                <li key={`action-${index}`} className="rounded-2xl bg-indigo-50 p-4 text-sm leading-6 text-indigo-950 ring-1 ring-indigo-100">
                   <strong>{index + 1}단계.</strong> {item}
                 </li>
               ))}
@@ -812,7 +819,7 @@ export default function CareerDiagnosisMVP() {
     const names = topRIASEC.map(([key]) => riasecLabels[key]?.name).filter(Boolean).join(" + ");
     const topPersonalityName = topPersonality[0]?.[0] || "성격 강점";
     const topAptitudeName = topAptitude[0]?.[0] || "업무 강점";
-    const summary = `${profile.name ? `${profile.name}님의 ` : ""}주요 진로 성향은 ${names || "진단 완료 후 표시"}입니다. ${topPersonalityName} 특성과 ${topAptitudeName} 역량을 함께 활용할 수 있는 직무에서 강점이 나타날 가능성이 높습니다. 현재 준비 단계는 '${level.label}'입니다.`;
+    const summary = `${profile.name ? `${profile.name}님, ` : ""}검사 기준으로는 ${names || "진단 완료 후 표시"} 성향이 먼저 드러나요. ${topPersonalityName} 성향과 ${topAptitudeName} 역량을 직무에 연결해 말할 수 있으면 서류·면접에서 설득력이 올라갑니다. 지금은 '${level.label}' 구간에 가깝게 보여요.`;
     return { interest, personality, aptitude, maturityAvg, readinessAvg, topRIASEC, topPersonality, topAptitude, level, jobs, summary };
   }, [answers, profile.name]);
 

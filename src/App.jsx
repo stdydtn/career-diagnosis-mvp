@@ -1,8 +1,9 @@
-import React, { useSyncExternalStore } from "react";
+import React, { useEffect, useSyncExternalStore } from "react";
 import CareerDiagnosisMVP from "./CareerDiagnosisMVP.jsx";
 import AdminSubmissionsPage from "./AdminSubmissionsPage.jsx";
 import DeployEnvBanner from "./DeployEnvBanner.jsx";
 import SupabaseDbHealthBanner from "./SupabaseDbHealthBanner.jsx";
+import { trackSiteVisitOnce } from "./lib/trackVisit.js";
 
 function readHash() {
   if (typeof window === "undefined") return "#/";
@@ -22,6 +23,11 @@ function useHashPath() {
 
 export default function App() {
   const route = useHashPath();
+
+  useEffect(() => {
+    if (route !== "admin") trackSiteVisitOnce();
+  }, [route]);
+
   return (
     <>
       <DeployEnvBanner />
