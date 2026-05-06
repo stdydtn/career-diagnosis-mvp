@@ -456,20 +456,41 @@ function FeedbackSurveyPage({
 
   const [submitBusy, setSubmitBusy] = useState(false);
 
+  const generateAiReport = async () => {
+    const fallback = createDetailedReport(result, profile, feedback);
+    const aiReport = await callCareerAI({
+      mode: "report",
+      profile,
+      result,
+      feedback,
+    });
+    const aiData = aiReport?.data && typeof aiReport.data === "object" ? aiReport.data : {};
+    return normalizeReportLanguage({
+      ...fallback,
+      createdAt: new Date().toLocaleDateString("ko-KR"),
+      participant: profile,
+      ai: true,
+      title: aiData.title || fallback.title,
+      summary: aiData.summary || fallback.summary,
+      profileText: aiData.careerInterpretation || fallback.profileText,
+      strengths: Array.isArray(aiData.strengths) && aiData.strengths.length > 0 ? aiData.strengths : fallback.strengths,
+      recommendedJobs: Array.isArray(aiData.recommendedJobs) && aiData.recommendedJobs.length > 0 ? aiData.recommendedJobs : fallback.recommendedJobs,
+      actionPlan: Array.isArray(aiData.actionPlan) && aiData.actionPlan.length > 0 ? aiData.actionPlan : fallback.actionPlan,
+    });
+  };
+
   const submitSurvey = async () => {
     if (!canSubmit || submitBusy) return;
 
     try {
       setSubmitBusy(true);
 
-      const baseReport = createDetailedReport(result, profile, feedback);
-      const report = normalizeReportLanguage(baseReport);
-
       if (!submissionId) {
         alert("저장 세션이 없습니다. 커리어 진단 탭에서 개인정보를 입력한 뒤 「진단 시작하기」로 1차 저장을 완료한 다음 다시 시도하세요.");
         return;
       }
 
+      const report = await generateAiReport();
       const ai = await fetchReportCoachSafe(report);
       const detailedReport = {
         ...report,
@@ -486,7 +507,7 @@ function FeedbackSurveyPage({
       const msg = error?.message || String(error);
       const details = error?.details || error?.hint || "";
       console.error(error);
-      alert(`데이터 저장 중 오류가 발생했습니다.\n\n${msg}${details ? `\n${details}` : ""}\n\nVercel: Environment Variables(VITE_SUPABASE_*) 후 재배포. Supabase: patch_anon_select.sql·patch_answers_and_update.sql(RLS·UPDATE·answers).`);
+      alert(`AI 리포트 생성 또는 데이터 저장 중 오류가 발생했습니다.\n\n${msg}${details ? `\n${details}` : ""}\n\nVercel: Environment Variables(VITE_SUPABASE_*) 후 재배포. Supabase: patch_anon_select.sql·patch_answers_and_update.sql(RLS·UPDATE·answers).`);
     } finally {
       setSubmitBusy(false);
     }
