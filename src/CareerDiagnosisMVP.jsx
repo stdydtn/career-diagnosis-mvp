@@ -193,7 +193,7 @@ function DiagnosisPage({
   const [aiInsightError, setAiInsightError] = useState("");
 
   const fetchAiInsight = async () => {
-    if (!isComplete) return;
+    if (!isComplete || aiDiagnosis) return;
     setAiInsightError("");
     try {
       setAiLoading(true);
@@ -324,10 +324,10 @@ function DiagnosisPage({
                   <button
                     type="button"
                     onClick={fetchAiInsight}
-                    disabled={aiLoading}
+                    disabled={aiLoading || Boolean(aiDiagnosis)}
                     className="shrink-0 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-violet-300"
                   >
-                    {aiLoading ? "생성 중…" : aiDiagnosis ? "다시 받기" : "AI 진단 결과 생성하기"}
+                    {aiLoading ? "생성 중…" : aiDiagnosis ? "AI 진단 생성 완료" : "AI 진단 결과 생성하기"}
                   </button>
                 </div>
                 {aiInsightError ? <p className="mt-3 text-sm leading-6 text-rose-700">{aiInsightError}</p> : null}
@@ -450,9 +450,13 @@ function FeedbackSurveyPage({
   submissionId,
   setGeneratedReport,
   switchTab,
+  aiDiagnosis,
+  aiCoverLetterReview,
+  generatedReport,
 }) {
   const update = (field, value) => setFeedback((prev) => ({ ...prev, [field]: value }));
-  const canSubmit = isComplete && feedback.satisfaction && feedback.usefulness && feedback.easyToUse && feedback.recommend && feedback.paidIntent && feedback.improvement.trim();
+  const aiReportGenerated = Boolean(generatedReport?.ai);
+  const canSubmit = isComplete && feedback.satisfaction && feedback.usefulness && feedback.easyToUse && feedback.recommend && feedback.paidIntent && feedback.improvement.trim() && !aiReportGenerated;
 
   const [submitBusy, setSubmitBusy] = useState(false);
 
@@ -489,6 +493,11 @@ function FeedbackSurveyPage({
         alert("저장 세션이 없습니다. 커리어 진단 탭에서 개인정보를 입력한 뒤 「진단 시작하기」로 1차 저장을 완료한 다음 다시 시도하세요.");
         return;
       }
+      if (aiReportGenerated) {
+        alert("AI 상세 리포트는 후기조사 완료 후 1회만 생성됩니다.");
+        switchTab("basicReport");
+        return;
+      }
 
       const report = await generateAiReport();
       const ai = await fetchReportCoachSafe(report);
@@ -499,7 +508,13 @@ function FeedbackSurveyPage({
         aiCoachGeneratedAt: ai.aiCoachGeneratedAt,
       };
 
-      await updateDiagnosisAfterFeedback(submissionId, { feedback, detailedReport });
+      await updateDiagnosisAfterFeedback(submissionId, {
+        feedback,
+        detailedReport,
+        aiDiagnosis,
+        aiReport: report,
+        aiCoverLetterReview,
+      });
 
       setGeneratedReport(detailedReport);
       switchTab("basicReport");
@@ -562,7 +577,7 @@ function FeedbackSurveyPage({
         <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <p className="text-sm leading-6 text-slate-500">* 표시 항목을 입력하면 베이직 리포트를 생성할 수 있습니다.</p>
           <button type="button" onClick={submitSurvey} disabled={!canSubmit || submitBusy} className="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
-            {submitBusy ? "저장 중(AI 코칭 포함)…" : "후기 제출하고 PDF 저장하러 가기"}
+            {submitBusy ? "저장 중(AI 코칭 포함)…" : aiReportGenerated ? "AI 상세 리포트 생성 완료" : "후기 제출하고 PDF 저장하러 가기"}
           </button>
         </div>
         <p className="mt-3 text-xs leading-5 text-slate-500">
@@ -825,7 +840,7 @@ function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmi
   );
 }
 
-function CoverLetterPage({ result, isComplete, profile }) {
+function CoverLetterPage({ result, isComplete, profile, aiCoverLetterReview, setAiCoverLetterReview, aiCoverLetterLoading, setAiCoverLetterLoading }) {
   const initialItems = [1, 2, 3, 4].map((id) => ({ id, question: "", answer: "" }));
   const [coverLetter, setCoverLetter] = useState({ company: "", job: profile.targetJob || "", items: initialItems });
 
@@ -853,7 +868,26 @@ function CoverLetterPage({ result, isComplete, profile }) {
 
   const [aiByItem, setAiByItem] = useState({});
 
+  const runAiCoverLetterReview = async () => {
+    if (aiCoverLetterReview) return;
+    try {
+      setAiCoverLetterLoading(true);
+      const aiReview = await callCareerAI({
+        mode: "coverLetter",
+        profile,
+        result,
+        coverLetter,
+      });
+      setAiCoverLetterReview(aiReview.data || aiReview.raw);
+    } catch (error) {
+      alert("AI 자기소개서 첨삭 중 오류가 발생했습니다.");
+    } finally {
+      setAiCoverLetterLoading(false);
+    }
+  };
+
   const runAiCover = async (itemId) => {
+    if (aiCoverLetterReview) return;
     const row = coverLetter.items.find((x) => x.id === itemId);
     if (!row?.answer?.trim()) return;
     setAiByItem((prev) => ({ ...prev, [itemId]: { loading: true, error: "" } }));
@@ -914,7 +948,47 @@ function CoverLetterPage({ result, isComplete, profile }) {
             <InputField label="지원 회사" value={coverLetter.company} onChange={(value) => updateBase("company", value)} placeholder="예: 삼성전자, 한국전력공사" />
             <InputField label="지원 직무" value={coverLetter.job} onChange={(value) => updateBase("job", value)} placeholder="예: 인사, 영업관리, 행정" />
           </div>
+          <div className="mt-5 flex items-center justify-end">
+            <button
+              type="button"
+              onClick={runAiCoverLetterReview}
+              disabled={aiCoverLetterLoading || Boolean(aiCoverLetterReview)}
+              className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {aiCoverLetterLoading ? "생성 중…" : aiCoverLetterReview ? "AI 첨삭 생성 완료" : "AI 자기소개서 첨삭하기"}
+            </button>
+          </div>
         </section>
+
+        {aiCoverLetterReview ? (
+          <section className="rounded-3xl border border-violet-200 bg-violet-50/90 p-6 ring-1 ring-violet-100">
+            <p className="text-sm font-black text-violet-900">AI 자기소개서 첨삭 결과</p>
+            {typeof aiCoverLetterReview === "string" ? <p className="mt-3 whitespace-pre-line text-sm leading-7 text-violet-950">{aiCoverLetterReview}</p> : null}
+            {typeof aiCoverLetterReview === "object" && aiCoverLetterReview ? (
+              <div className="mt-4 space-y-4">
+                {aiCoverLetterReview.overallComment ? (
+                  <div>
+                    <p className="text-sm font-bold text-violet-900">전체 총평</p>
+                    <p className="mt-2 whitespace-pre-line text-sm leading-7 text-violet-950">{aiCoverLetterReview.overallComment}</p>
+                  </div>
+                ) : null}
+                {Array.isArray(aiCoverLetterReview.items) && aiCoverLetterReview.items.length > 0 ? (
+                  <div className="space-y-3">
+                    {aiCoverLetterReview.items.map((item, index) => (
+                      <div key={`ai-item-${item.questionNo || index}`} className="rounded-2xl bg-white/90 p-4 ring-1 ring-violet-100">
+                        <p className="text-sm font-black text-violet-900">문항 {item.questionNo || "-"}</p>
+                        {item.diagnosisBasedAdvice ? <p className="mt-2 text-sm leading-7 text-violet-950">{item.diagnosisBasedAdvice}</p> : null}
+                        {item.sampleRevision ? (
+                          <div className="mt-3 rounded-xl bg-violet-50 p-3 text-sm leading-7 text-violet-950 ring-1 ring-violet-100">{item.sampleRevision}</div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         {coverLetter.items.map((item) => {
           const currentReview = reviews.find((reviewItem) => reviewItem.id === item.id)?.review;
@@ -1018,10 +1092,10 @@ function CoverLetterPage({ result, isComplete, profile }) {
                       <button
                         type="button"
                         onClick={() => runAiCover(item.id)}
-                        disabled={Boolean(aiByItem[item.id]?.loading)}
+                        disabled={Boolean(aiByItem[item.id]?.loading) || Boolean(aiCoverLetterReview)}
                         className="shrink-0 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-violet-300"
                       >
-                        {aiByItem[item.id]?.loading ? "생성 중…" : aiByItem[item.id]?.data ? "GPT 다시 받기" : "GPT 첨삭 받기"}
+                        {aiByItem[item.id]?.loading ? "생성 중…" : aiCoverLetterReview ? "AI 첨삭 생성 완료" : aiByItem[item.id]?.data ? "GPT 다시 받기" : "GPT 첨삭 받기"}
                       </button>
                     </div>
                     {aiByItem[item.id]?.error ? <p className="mt-3 text-sm leading-6 text-rose-700">{aiByItem[item.id].error}</p> : null}
@@ -1078,6 +1152,8 @@ export default function CareerDiagnosisMVP() {
   const [generatedReport, setGeneratedReport] = useState(null);
   const [aiDiagnosis, setAiDiagnosis] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiCoverLetterReview, setAiCoverLetterReview] = useState(null);
+  const [aiCoverLetterLoading, setAiCoverLetterLoading] = useState(false);
   const [feedback, setFeedback] = useState(emptyFeedback);
   const [profile, setProfile] = useState(emptyProfile);
   const [profileReady, setProfileReady] = useState(false);
@@ -1187,6 +1263,8 @@ export default function CareerDiagnosisMVP() {
     setGeneratedReport(null);
     setAiDiagnosis(null);
     setAiLoading(false);
+    setAiCoverLetterReview(null);
+    setAiCoverLetterLoading(false);
     setFeedback(emptyFeedback);
     setProfile(emptyProfile);
     setProfileReady(false);
@@ -1248,10 +1326,23 @@ export default function CareerDiagnosisMVP() {
           submissionId={submissionId}
           setGeneratedReport={setGeneratedReport}
           switchTab={switchTab}
+          aiDiagnosis={aiDiagnosis}
+          aiCoverLetterReview={aiCoverLetterReview}
+          generatedReport={generatedReport}
         />
       ) : null}
       {activeTab === "basicReport" ? <BasicReportPage generatedReport={generatedReport} isComplete={isComplete} switchTab={switchTab} feedbackSubmitted={feedbackSubmitted} /> : null}
-      {activeTab === "coverLetter" ? <CoverLetterPage result={result} isComplete={isComplete} profile={profile} /> : null}
+      {activeTab === "coverLetter" ? (
+        <CoverLetterPage
+          result={result}
+          isComplete={isComplete}
+          profile={profile}
+          aiCoverLetterReview={aiCoverLetterReview}
+          setAiCoverLetterReview={setAiCoverLetterReview}
+          aiCoverLetterLoading={aiCoverLetterLoading}
+          setAiCoverLetterLoading={setAiCoverLetterLoading}
+        />
+      ) : null}
     </div>
   );
 }

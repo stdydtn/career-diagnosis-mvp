@@ -4,6 +4,11 @@
 alter table public.diagnosis_submissions
   add column if not exists answers jsonb not null default '{}'::jsonb;
 
+alter table public.diagnosis_submissions
+  add column if not exists ai_diagnosis jsonb,
+  add column if not exists ai_report jsonb,
+  add column if not exists ai_cover_letter_review jsonb;
+
 alter table public.diagnosis_submissions enable row level security;
 
 drop policy if exists "allow_update_diagnosis_submissions" on public.diagnosis_submissions;

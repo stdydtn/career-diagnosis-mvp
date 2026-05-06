@@ -87,14 +87,17 @@ export async function updateDiagnosisAfterQuestions(submissionId, { answers, res
   return data;
 }
 
-/** 후기 제출: feedback + detailed_report (동일 행) */
-export async function updateDiagnosisAfterFeedback(submissionId, { feedback, detailedReport }) {
+/** 후기 제출: feedback + detailed_report + AI 결과(동일 행) */
+export async function updateDiagnosisAfterFeedback(submissionId, { feedback, detailedReport, aiDiagnosis, aiReport, aiCoverLetterReview }) {
   requireClient();
   const { data, error } = await supabase
     .from("diagnosis_submissions")
     .update({
       feedback: JSON.parse(JSON.stringify(feedback)),
       detailed_report: JSON.parse(JSON.stringify(detailedReport)),
+      ai_diagnosis: aiDiagnosis ? JSON.parse(JSON.stringify(aiDiagnosis)) : null,
+      ai_report: aiReport ? JSON.parse(JSON.stringify(aiReport)) : null,
+      ai_cover_letter_review: aiCoverLetterReview ? JSON.parse(JSON.stringify(aiCoverLetterReview)) : null,
     })
     .eq("id", submissionId)
     .select("id")

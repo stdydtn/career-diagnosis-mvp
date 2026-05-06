@@ -36,7 +36,10 @@ create table public.diagnosis_submissions (
   answers jsonb not null default '{}'::jsonb,
   detailed_report jsonb not null default '{}'::jsonb,
   result jsonb not null default '{}'::jsonb,
-  feedback jsonb
+  feedback jsonb,
+  ai_diagnosis jsonb,
+  ai_report jsonb,
+  ai_cover_letter_review jsonb
 );
 
 comment on table public.diagnosis_submissions is '커리어 진단 MVP: 1차 프로필 INSERT → 2차 answers/result UPDATE → 후기 시 feedback/detailed_report UPDATE';
