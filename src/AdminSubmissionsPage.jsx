@@ -230,6 +230,38 @@ function DetailedReportSection({ dr }) {
             <p className="mt-2 text-sm leading-relaxed text-slate-800">{safeDr.summary}</p>
           </div>
         ) : null}
+        {safeDr.aiCoach && typeof safeDr.aiCoach === "object" ? (
+          <div className="rounded-2xl border border-violet-200 bg-violet-50/90 p-5 ring-1 ring-violet-100">
+            <p className="text-xs font-black text-violet-800">AI 리포트 코칭</p>
+            {safeDr.aiCoachGeneratedAt ? (
+              <p className="mt-1 text-[11px] text-violet-700">생성 시각 {safeDr.aiCoachGeneratedAt}</p>
+            ) : null}
+            {safeDr.aiCoach.openingReflection ? (
+              <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-violet-950">{safeDr.aiCoach.openingReflection}</p>
+            ) : null}
+            {Array.isArray(safeDr.aiCoach.emphasisForApplications) && safeDr.aiCoach.emphasisForApplications.length > 0 ? (
+              <ul className="mt-3 space-y-2">
+                {safeDr.aiCoach.emphasisForApplications.map((t) => (
+                  <li key={t} className="rounded-xl bg-white/90 px-3 py-2 text-sm text-violet-950 ring-1 ring-violet-100">
+                    • {t}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {safeDr.aiCoach.oneWeekFocus ? (
+              <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-violet-950">
+                <span className="font-black text-violet-900">이번 주 집중: </span>
+                {safeDr.aiCoach.oneWeekFocus}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {safeDr.aiCoachError && !safeDr.aiCoach ? (
+          <div className="rounded-2xl border border-rose-100 bg-rose-50/80 p-4 text-sm text-rose-900 ring-1 ring-rose-100">
+            <p className="text-xs font-black text-rose-800">AI 코칭 자동 생성 실패</p>
+            <p className="mt-2">{safeDr.aiCoachError}</p>
+          </div>
+        ) : null}
         {safeDr.profileText ? (
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-slate-400">쉽게 보는 진로 성향</p>

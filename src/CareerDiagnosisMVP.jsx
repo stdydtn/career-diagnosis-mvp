@@ -26,7 +26,7 @@ import {
   updateDiagnosisAfterQuestions,
   updateDiagnosisProfile,
 } from "./lib/saveDiagnosis.js";
-import { callCareerAi } from "./lib/careerAiApi.js";
+import { buildReportCoachPayload, callCareerAi, fetchReportCoachSafe } from "./lib/careerAiApi.js";
 
 function phase2SessionKey(submissionId) {
   return `mvp_diag_phase2_${submissionId}`;
@@ -446,26 +446,41 @@ function FeedbackSurveyPage({
   const update = (field, value) => setFeedback((prev) => ({ ...prev, [field]: value }));
   const canSubmit = isComplete && feedback.satisfaction && feedback.usefulness && feedback.easyToUse && feedback.recommend && feedback.paidIntent && feedback.improvement.trim();
 
+  const [submitBusy, setSubmitBusy] = useState(false);
+
   const submitSurvey = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || submitBusy) return;
 
     try {
-      const report = createDetailedReport(result, profile, feedback);
+      setSubmitBusy(true);
+
+      const baseReport = createDetailedReport(result, profile, feedback);
+      const report = normalizeReportLanguage(baseReport);
 
       if (!submissionId) {
         alert("저장 세션이 없습니다. 커리어 진단 탭에서 개인정보를 입력한 뒤 「진단 시작하기」로 1차 저장을 완료한 다음 다시 시도하세요.");
         return;
       }
 
-      await updateDiagnosisAfterFeedback(submissionId, { feedback, detailedReport: report });
+      const ai = await fetchReportCoachSafe(report);
+      const detailedReport = {
+        ...report,
+        aiCoach: ai.aiCoach,
+        aiCoachError: ai.aiCoachError,
+        aiCoachGeneratedAt: ai.aiCoachGeneratedAt,
+      };
 
-      setGeneratedReport(report);
+      await updateDiagnosisAfterFeedback(submissionId, { feedback, detailedReport });
+
+      setGeneratedReport(detailedReport);
       switchTab("basicReport");
     } catch (error) {
       const msg = error?.message || String(error);
       const details = error?.details || error?.hint || "";
       console.error(error);
       alert(`데이터 저장 중 오류가 발생했습니다.\n\n${msg}${details ? `\n${details}` : ""}\n\nVercel: Environment Variables(VITE_SUPABASE_*) 후 재배포. Supabase: patch_anon_select.sql·patch_answers_and_update.sql(RLS·UPDATE·answers).`);
+    } finally {
+      setSubmitBusy(false);
     }
   };
 
@@ -517,10 +532,13 @@ function FeedbackSurveyPage({
 
         <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <p className="text-sm leading-6 text-slate-500">* 표시 항목을 입력하면 베이직 리포트를 생성할 수 있습니다.</p>
-          <button type="button" onClick={submitSurvey} disabled={!canSubmit} className="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
-            후기 제출하고 PDF 저장하러 가기
+          <button type="button" onClick={submitSurvey} disabled={!canSubmit || submitBusy} className="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
+            {submitBusy ? "저장 중(AI 코칭 포함)…" : "후기 제출하고 PDF 저장하러 가기"}
           </button>
         </div>
+        <p className="mt-3 text-xs leading-5 text-slate-500">
+          제출 시 GPT 기반 AI 리포트 코칭을 생성해 Supabase에 저장된 베이직 리포트(JSON)에 함께 넣습니다. OPENAI_API_KEY가 없으면 코칭 없이 리포트만 저장됩니다.
+        </p>
       </section>
     </main>
   );
@@ -533,19 +551,25 @@ function BasicReportPage({ generatedReport, isComplete, switchTab, feedbackSubmi
   const [aiCoachLoading, setAiCoachLoading] = useState(false);
   const [aiCoachError, setAiCoachError] = useState("");
 
+  useEffect(() => {
+    if (!generatedReport) {
+      setAiCoach(null);
+      setAiCoachError("");
+      return;
+    }
+    const r = normalizeReportLanguage(generatedReport);
+    setAiCoach(r.aiCoach ?? null);
+    setAiCoachError(r.aiCoachError || "");
+  }, [generatedReport]);
+
   const fetchAiCoach = async () => {
     if (!report) return;
+    const payload = buildReportCoachPayload(report);
+    if (!payload) return;
     setAiCoachLoading(true);
     setAiCoachError("");
     try {
-      const data = await callCareerAi("report_coach", {
-        title: report.title,
-        summary: report.summary,
-        stage: report.stage,
-        strengths: report.strengths,
-        actionPlan: report.actionPlan,
-        participant: report.participant,
-      });
+      const data = await callCareerAi("report_coach", payload);
       setAiCoach(data);
     } catch (err) {
       setAiCoachError(err.message || String(err));

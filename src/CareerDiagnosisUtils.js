@@ -248,6 +248,30 @@ export function buildPlainTextReport(report) {
     lines.push("[이번주 취업준비 체크리스트]");
     report.weeklyChecklist.forEach((item, index) => lines.push(`${index + 1}. ${item}`));
   }
+  const coach = report.aiCoach;
+  if (coach && typeof coach === "object") {
+    lines.push("");
+    lines.push("[AI 리포트 코칭]");
+    if (coach.openingReflection) lines.push(coach.openingReflection);
+    if (Array.isArray(coach.emphasisForApplications) && coach.emphasisForApplications.length > 0) {
+      lines.push("");
+      lines.push("지원 시 강조하면 좋은 점:");
+      coach.emphasisForApplications.forEach((t, i) => lines.push(`${i + 1}. ${t}`));
+    }
+    if (coach.oneWeekFocus) {
+      lines.push("");
+      lines.push("이번 주 집중하면 좋은 일:");
+      lines.push(coach.oneWeekFocus);
+    }
+    if (report.aiCoachGeneratedAt) {
+      lines.push("");
+      lines.push(`(생성 시각: ${report.aiCoachGeneratedAt})`);
+    }
+  } else if (report.aiCoachError) {
+    lines.push("");
+    lines.push("[AI 코칭]");
+    lines.push(`자동 생성되지 않았습니다: ${report.aiCoachError}`);
+  }
   return lines;
 }
 
