@@ -115,9 +115,18 @@ function ProfileForm({ profile, setProfile, onStart, startBusy }) {
           <label className="flex gap-3 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-950 ring-1 ring-amber-100">
             <input type="checkbox" checked={profile.privacyConsent} onChange={(event) => update("privacyConsent", event.target.checked)} className="mt-1" />
             <span>
-              <strong>필수</strong> 개인정보 수집 및 진단 결과 활용에 동의합니다.
+              <strong>필수</strong> 서비스 이용 및 개인정보 처리(진단·AI 분석 포함)에 동의합니다.
             </span>
           </label>
+          <div className="rounded-2xl bg-slate-50 p-4 text-xs leading-6 text-slate-700 ring-1 ring-slate-200">
+            <p className="font-bold text-slate-900">개인정보 처리 안내(요약)</p>
+            <p className="mt-2">- AI 분석을 위해 입력 정보(이름, 이메일, 연락처, 학교, 학점, 자격증, 어학성적, 자기소개서)와 진단 결과가 외부 AI API 처리 과정에 사용될 수 있습니다.</p>
+            <p>- 수집 목적: 커리어 진단 결과 제공, 베이직 리포트 생성, 자기소개서 첨삭, 서비스 품질 개선.</p>
+            <p>- 보관 기간: 이용 목적 달성 시까지 또는 이용자 삭제 요청 접수 시 지체 없이 파기.</p>
+            <p>- 삭제 요청 방법: 서비스 문의 채널 또는 운영자 이메일로 본인 확인 후 삭제 요청.</p>
+            <p>- 서비스 이용 동의(필수)와 마케팅 정보 수신 동의(선택)는 별도로 운영됩니다.</p>
+            <p>- 주민등록번호, 상세 주소, 개인 연락처 등 민감정보는 입력하지 마세요.</p>
+          </div>
           <label className="flex gap-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700 ring-1 ring-slate-200">
             <input type="checkbox" checked={profile.marketingConsent} onChange={(event) => update("marketingConsent", event.target.checked)} className="mt-1" />
             <span>
@@ -1008,6 +1017,9 @@ function CoverLetterPage({ result, isComplete, profile, aiCoverLetterReview, set
               </label>
 
               <label className="mt-4 block">
+                <div className="mb-2 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 ring-1 ring-amber-100">
+                  민감정보 입력 금지: 개인 연락처, 주민등록번호, 상세 주소, 계좌번호 등은 자기소개서 내용에 포함하지 마세요.
+                </div>
                 <span className="mb-2 block text-sm font-bold text-slate-700">답변 {item.id}</span>
                 <textarea value={item.answer} onChange={(event) => updateItem(item.id, "answer", event.target.value)} placeholder={`첨삭받고 싶은 ${item.id}번 답변을 붙여넣어 주세요.`} rows={10} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 outline-none transition focus:border-slate-900 focus:bg-white" />
               </label>
