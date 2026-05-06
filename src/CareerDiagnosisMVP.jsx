@@ -1,24 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { emptyFeedback, emptyProfile } from "./CareerDiagnosisData.js";
 import {
-  aptitudeLabels,
-  buildDiagnosisPages,
-  emptyFeedback,
-  emptyProfile,
-  jobMap,
-  personalityLabels,
-  questions,
-  riasecLabels,
-  scale,
-} from "./CareerDiagnosisData.js";
-import {
-  average,
   buildCoverLetterReview,
-  computeScores,
   createDetailedReport,
-  getReadinessLevel,
   normalizeReportLanguage,
-  pct,
-  topEntries,
 } from "./CareerDiagnosisUtils.js";
 import {
   insertDiagnosisProfile,
@@ -26,8 +11,10 @@ import {
   updateDiagnosisAfterQuestions,
   updateDiagnosisProfile,
 } from "./lib/saveDiagnosis.js";
-import { buildReportCoachPayload, callCareerAi, fetchReportCoachSafe } from "./lib/careerAiApi.js";
+import { fetchReportCoachSafe } from "./lib/careerAiApi.js";
 import { callCareerAI } from "./lib/ai.js";
+import { buildQuestionPages, computeCareerAssessment, questionCount } from "./lib/careerAssessmentEngine";
+import { sectionMeta } from "./data/careerQuestionBank";
 
 function phase2SessionKey(submissionId) {
   return `mvp_diag_phase2_${submissionId}`;
@@ -82,15 +69,21 @@ function ProfileForm({ profile, setProfile, onStart, startBusy }) {
     <main className="mx-auto max-w-5xl px-5 py-8">
       <section className="rounded-3xl bg-slate-900 p-8 text-white shadow-sm">
         <p className="text-sm font-bold text-slate-300">STEP 0</p>
-        <h2 className="mt-2 text-3xl font-black tracking-tight">진단 전 기본정보 입력</h2>
-        <p className="mt-4 max-w-3xl leading-7 text-slate-200">진단 결과를 더 정확하게 해석하고, 추후 리포트와 자기소개서 첨삭으로 연결하기 위한 기본정보를 입력합니다.</p>
+        <h2 className="mt-2 text-3xl font-black tracking-tight">AI 커리어핏 진단</h2>
+        <p className="mt-4 max-w-3xl leading-7 text-slate-200">
+          본 검사는 대기업·공공기관 직무기초역량 평가 요소와 직업상담 진단 요소를 참고해 개발한 자체 커리어진단입니다.
+          검사 결과를 바탕으로 적합 직무군, 강점 역량, 보완 포인트, 자기소개서·면접 방향을 AI가 해석합니다.
+        </p>
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          참고 안내: 특정 기업의 공식 검사나 채용 결과를 예측하는 용도가 아니며, 진로 탐색 지원을 위한 참고 자료입니다. (소요시간 약 15~20분, 총 52문항)
+        </p>
       </section>
 
       <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
         <div className="mb-6">
           <p className="text-sm font-bold text-slate-500">PARTICIPANT INFO</p>
           <h3 className="text-2xl font-black tracking-tight">개인정보 및 진로정보</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-500">「진단 시작하기」를 누르면 1차로 프로필이 Supabase에 저장됩니다. 45문항을 모두 응답하면 같은 참가 행에 답변·진단 결과가 2차 저장됩니다.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-500">「진단 시작하기」를 누르면 1차로 프로필이 Supabase에 저장됩니다. 52문항을 모두 응답하면 같은 참가 행에 답변·진단 결과가 2차 저장됩니다.</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -183,21 +176,23 @@ function DiagnosisPage({
   aiLoading,
   setAiLoading,
 }) {
-  const pages = useMemo(() => buildDiagnosisPages(), []);
+  const pages = useMemo(() => buildQuestionPages(), []);
   const [currentPage, setCurrentPage] = useState(0);
   const questionTopRef = useRef(null);
   const currentPageData = pages[currentPage] || pages[0];
-  const currentQuestions = currentPageData?.questions || [];
-  const currentPageDone = currentQuestions.every((q) => answers[q.id]);
+  const currentQuestion = currentPageData?.question || null;
+  const currentPageDone = currentQuestion ? Boolean(answers[currentQuestion.id]) : false;
   const answeredCount = Object.keys(answers).length;
-  const progress = Math.round((answeredCount / questions.length) * 100);
-  const sectionStats = [...new Set(questions.map((q) => q.section))].map((section) => {
-    const sectionQuestions = questions.filter((q) => q.section === section);
+  const totalCount = questionCount();
+  const progress = Math.round((answeredCount / totalCount) * 100);
+  const sectionOrder = ["aptitude", "situational", "interest", "values", "workstyle", "readiness"];
+  const sectionStats = sectionOrder.map((section) => {
+    const sectionQuestions = pages.filter((p) => p.section === section).map((p) => p.question);
     const answered = sectionQuestions.filter((q) => answers[q.id]).length;
     const firstPageIndex = pages.findIndex((page) => page.section === section);
-    return { section, answered, total: sectionQuestions.length, firstPageIndex };
+    return { section, title: sectionMeta[section].title, answered, total: sectionQuestions.length, firstPageIndex };
   });
-  const setAnswer = (id, value) => setAnswers((prev) => ({ ...prev, [id]: value }));
+  const setAnswer = (id, value) => setAnswers((prev) => ({ ...prev, [id]: String(value) }));
 
   const [aiInsightError, setAiInsightError] = useState("");
 
@@ -237,12 +232,10 @@ function DiagnosisPage({
           <p className="text-sm font-bold text-slate-500">검사 진행률</p>
           <div className="mt-3 flex items-end gap-2">
             <span className="text-5xl font-black tracking-tight">{progress}%</span>
-            <span className="pb-2 text-sm text-slate-500">
-              {answeredCount}/{questions.length}문항
-            </span>
+            <span className="pb-2 text-sm text-slate-500">{answeredCount}/{totalCount}문항</span>
           </div>
           <p className="mt-3 text-sm leading-6 text-slate-500">
-            현재 {currentPage + 1}/{pages.length}페이지 · 검사별 최대 5문항
+            현재 {currentPage + 1}/{pages.length}페이지
           </p>
         </section>
         <section className="rounded-3xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
@@ -253,9 +246,9 @@ function DiagnosisPage({
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="font-bold">
-                      {index + 1}. {item.section} ({item.answered}/{item.total})
+                      {index + 1}. {item.title} ({item.answered}/{item.total})
                     </div>
-                    <div className={`mt-1 text-xs ${active ? "text-slate-300" : "text-slate-500"}`}>검사별 페이지는 최대 5문항씩 표시됩니다</div>
+                    <div className={`mt-1 text-xs ${active ? "text-slate-300" : "text-slate-500"}`}>검사 섹션으로 바로 이동</div>
                   </div>
                   <div>{item.answered === item.total ? "✓" : "›"}</div>
                 </div>
@@ -270,32 +263,35 @@ function DiagnosisPage({
           <div className="mb-6 flex flex-col justify-between gap-3 md:flex-row md:items-end">
             <div>
               <p className="text-sm font-bold text-slate-500">PAGE {currentPage + 1}</p>
-              <h2 className="text-3xl font-black tracking-tight">{currentPageData?.section}</h2>
-              <p className="mt-2 text-sm text-slate-500">같은 검사 영역의 문항만 최대 5개씩 표시됩니다.</p>
+              <h2 className="text-3xl font-black tracking-tight">{currentPageData?.sectionTitle}</h2>
+              <p className="mt-2 text-sm text-slate-500">{currentPageData?.sectionTitle} ({currentPageData?.sectionIndex}/{currentPageData?.sectionTotal})</p>
             </div>
-            <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600">1점 전혀 아니다 · 5점 매우 그렇다</div>
+            <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600">문항 유형에 맞는 선택지를 고르세요</div>
           </div>
 
-          <div className="space-y-4">
-            {currentQuestions.map((q) => (
-              <div key={q.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                <div className="mb-4 flex gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-black text-slate-700 ring-1 ring-slate-200">{q.id}</span>
-                  <div>
-                    <p className="text-xs font-bold text-slate-500">{q.section}</p>
-                    <p className="font-bold leading-7">{q.text}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {scale.map((value) => (
-                    <button key={value} type="button" onClick={() => setAnswer(q.id, value)} className={`rounded-2xl border px-2 py-3 text-center transition ${answers[q.id] === value ? "border-slate-900 bg-slate-900 text-white shadow-sm" : "border-slate-200 bg-white hover:border-slate-400"}`}>
-                      <div className="text-xl font-black">{value}</div>
-                    </button>
-                  ))}
+          {currentQuestion ? (
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="mb-4 flex gap-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-black text-slate-700 ring-1 ring-slate-200">{currentPage + 1}</span>
+                <div>
+                  <p className="text-xs font-bold text-slate-500">{currentPageData?.sectionTitle}</p>
+                  <p className="font-bold leading-7">{currentQuestion.question}</p>
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(currentQuestion.options || []).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setAnswer(currentQuestion.id, opt.id)}
+                    className={`rounded-2xl border px-3 py-3 text-left text-sm transition ${answers[currentQuestion.id] === String(opt.id) ? "border-slate-900 bg-slate-900 text-white shadow-sm" : "border-slate-200 bg-white hover:border-slate-400"}`}
+                  >
+                    {opt.text}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
             <button type="button" onClick={() => movePage(currentPage - 1)} disabled={currentPage === 0} className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-black shadow-sm hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">
@@ -363,38 +359,23 @@ function DiagnosisPage({
                 <p className="mt-1">- AI 해설은 진단 완료 후 1회만 생성됩니다.</p>
                 <p>- AI 기능은 서버에 <strong>OPENAI_API_KEY</strong>가 설정된 환경에서 동작합니다. 로컬 테스트는 <strong>Vercel 개발 모드</strong>로 실행하세요.</p>
               </section>
-              <div className="grid gap-5 xl:grid-cols-3">
-                <div className="rounded-3xl border border-slate-200 p-5">
-                  <h3 className="font-black">관심·선호 유형 TOP 3</h3>
-                  <div className="mt-4 space-y-3">
-                    {result.topRIASEC.map(([key, score], index) => (
-                      <ScoreBar key={key} label={`${index + 1}. ${riasecLabels[key].name}`} value={pct(score)} description={riasecLabels[key].desc} />
-                    ))}
-                  </div>
-                </div>
-                <div className="rounded-3xl border border-slate-200 p-5">
-                  <h3 className="font-black">성격 강점 TOP 3</h3>
-                  <div className="mt-4 space-y-3">
-                    {result.topPersonality.map(([key, score], index) => (
-                      <ScoreBar key={key} label={`${index + 1}. ${key}`} value={pct(score)} description={personalityLabels[key]} />
-                    ))}
-                  </div>
-                </div>
-                <div className="rounded-3xl border border-slate-200 p-5">
-                  <h3 className="font-black">업무 강점 TOP 3</h3>
-                  <div className="mt-4 space-y-3">
-                    {result.topAptitude.map(([key, score], index) => (
-                      <ScoreBar key={key} label={`${index + 1}. ${key}`} value={pct(score)} description={aptitudeLabels[key]} />
-                    ))}
-                  </div>
-                </div>
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                <ScoreBar label="직무기초 사고력" value={result.sectionScores.aptitude} />
+                <ScoreBar label="문제해결·상황판단" value={result.sectionScores.situational} />
+                <ScoreBar label="직무흥미" value={result.sectionScores.interest} />
+                <ScoreBar label="직업가치관" value={result.sectionScores.values} />
+                <ScoreBar label="업무성향·조직적합" value={result.sectionScores.workstyle} />
+                <ScoreBar label="취업준비도" value={result.sectionScores.readiness} />
               </div>
               <div className="rounded-3xl border border-slate-200 p-6">
                 <h3 className="font-black">추천 직무 TOP 5</h3>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {result.jobs.slice(0, 5).map((job, index) => (
-                    <div key={job} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-bold ring-1 ring-slate-100">
-                      {index + 1}. {job}
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {result.recommendedJobGroups.slice(0, 5).map((job, index) => (
+                    <div key={job.name} className="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                      <p className="text-sm font-bold">
+                        {index + 1}. {job.name} ({job.score}점)
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-600">{job.reasons.join(" ")}</p>
                     </div>
                   ))}
                 </div>
@@ -415,6 +396,75 @@ function DiagnosisPage({
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-500">베이직 리포트는 바로 확인할 수 있으며, PDF 저장은 MVP 사용 후기 조사 후 가능합니다.</p>
               </div>
+              <section className="rounded-3xl border border-slate-200 p-6">
+                <h3 className="text-xl font-black">대표 커리어 유형</h3>
+                <p className="mt-3 text-lg font-semibold text-slate-900">{result.representativeCareerType}</p>
+              </section>
+              <section className="grid gap-5 lg:grid-cols-2">
+                <div className="rounded-3xl border border-slate-200 p-6">
+                  <h3 className="font-black">강점 역량 TOP 3</h3>
+                  <ul className="mt-3 space-y-2">
+                    {result.topStrengths.map((item) => (
+                      <li key={item} className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-100">
+                        • {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-3xl border border-slate-200 p-6">
+                  <h3 className="font-black">보완 필요 영역 TOP 3</h3>
+                  <ul className="mt-3 space-y-2">
+                    {result.improvementAreas.map((item) => (
+                      <li key={item} className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-100">
+                        • {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+              <section className="rounded-3xl border border-slate-200 p-6">
+                <h3 className="font-black">추천 기업유형</h3>
+                <div className="mt-3 space-y-3">
+                  {result.recommendedCompanyTypes.map((item) => (
+                    <div key={item.name} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                      <p className="font-bold">{item.name} ({item.score}점)</p>
+                      <p className="mt-1 text-sm text-slate-600">{item.reasons.join(" ")}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+              <section className="grid gap-5 lg:grid-cols-2">
+                <div className="rounded-3xl border border-slate-200 p-6">
+                  <h3 className="font-black">자기소개서 어필 포인트</h3>
+                  <ul className="mt-3 space-y-2">
+                    {result.selfIntroPoints.map((item) => (
+                      <li key={item} className="rounded-2xl bg-indigo-50 px-4 py-3 text-sm text-indigo-900 ring-1 ring-indigo-100">
+                        • {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-3xl border border-slate-200 p-6">
+                  <h3 className="font-black">면접 답변 방향</h3>
+                  <ul className="mt-3 space-y-2">
+                    {result.interviewDirections.map((item) => (
+                      <li key={item} className="rounded-2xl bg-cyan-50 px-4 py-3 text-sm text-cyan-900 ring-1 ring-cyan-100">
+                        • {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+              <section className="rounded-3xl border border-slate-200 p-6">
+                <h3 className="font-black">앞으로 4주간 취업준비 전략</h3>
+                <ol className="mt-3 space-y-2">
+                  {result.fourWeekPlan.map((item, idx) => (
+                    <li key={item} className="rounded-2xl bg-purple-50 px-4 py-3 text-sm text-purple-900 ring-1 ring-purple-100">
+                      <strong>{idx + 1}주차.</strong> {item}
+                    </li>
+                  ))}
+                </ol>
+              </section>
             </div>
           )}
         </section>
@@ -1061,7 +1111,14 @@ function CoverLetterPage({ result, isComplete, profile, aiCoverLetterReview, set
 }
 
 export default function CareerDiagnosisMVP() {
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState(() => {
+    try {
+      const raw = localStorage.getItem("career_assessment_answers_v2");
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
   const [activeTab, setActiveTab] = useState("diagnosis");
   const [generatedReport, setGeneratedReport] = useState(null);
   const [aiDiagnosis, setAiDiagnosis] = useState(null);
@@ -1074,28 +1131,49 @@ export default function CareerDiagnosisMVP() {
   const [submissionId, setSubmissionId] = useState(null);
   const [startBusy, setStartBusy] = useState(false);
   const appTopRef = useRef(null);
-  const isComplete = Object.keys(answers).length === questions.length;
+  const isComplete = Object.keys(answers).length === questionCount();
   const feedbackSubmitted = Boolean(feedback.satisfaction && feedback.usefulness && feedback.easyToUse && feedback.recommend && feedback.paidIntent && feedback.improvement.trim());
 
   const result = useMemo(() => {
-    const interest = computeScores(answers, "interest");
-    const personality = computeScores(answers, "personality");
-    const aptitude = computeScores(answers, "aptitude");
-    const maturity = computeScores(answers, "maturity");
-    const readiness = computeScores(answers, "readiness");
-    const maturityAvg = average(Object.values(maturity));
-    const readinessAvg = average(Object.values(readiness));
-    const topRIASEC = topEntries(interest, 3);
-    const topPersonality = topEntries(personality, 3);
-    const topAptitude = topEntries(aptitude, 3);
-    const level = getReadinessLevel(maturityAvg, readinessAvg);
-    const jobs = [...new Set(topRIASEC.flatMap(([key]) => jobMap[key] || []))].slice(0, 5);
-    const names = topRIASEC.map(([key]) => riasecLabels[key]?.name).filter(Boolean).join(" + ");
-    const topPersonalityName = topPersonality[0]?.[0] || "성격 강점";
-    const topAptitudeName = topAptitude[0]?.[0] || "업무 강점";
-    const summary = `${profile.name ? `${profile.name}님, ` : ""}검사 기준으로는 ${names || "진단 완료 후 표시"} 성향이 먼저 드러나요. ${topPersonalityName} 성향과 ${topAptitudeName} 역량을 직무에 연결해 말할 수 있으면 서류·면접에서 설득력이 올라갑니다. 지금은 '${level.label}' 구간에 가깝게 보여요.`;
-    return { interest, personality, aptitude, maturityAvg, readinessAvg, topRIASEC, topPersonality, topAptitude, level, jobs, summary };
+    const assessment = computeCareerAssessment(answers);
+    const interestProfile = assessment.interestProfile;
+    const interestMap = {
+      analytical: "I",
+      practical: "R",
+      creative: "A",
+      social: "S",
+      enterprising: "E",
+      conventional: "C",
+    };
+    const topRIASEC = Object.entries(interestProfile)
+      .map(([k, v]) => [interestMap[k] || "I", v])
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+    const topAptitude = Object.entries(assessment.normalizedScores)
+      .filter(([k]) => ["verbal", "numerical", "dataInterpretation", "logicalReasoning"].includes(k))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+    const topPersonality = Object.entries(assessment.workstyleProfile).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const jobs = assessment.recommendedJobGroups.map((j) => j.name);
+    const summary = `${profile.name ? `${profile.name}님, ` : ""}${assessment.summary}`;
+    return {
+      ...assessment,
+      topRIASEC,
+      topAptitude,
+      topPersonality,
+      jobs,
+      summary,
+      level: { label: "프로파일 분석형" },
+    };
   }, [answers, profile.name]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("career_assessment_answers_v2", JSON.stringify(answers));
+    } catch {
+      /* ignore */
+    }
+  }, [answers]);
 
   const answersRef = useRef(answers);
   const resultRef = useRef(result);
@@ -1190,8 +1268,8 @@ export default function CareerDiagnosisMVP() {
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-xl font-black tracking-tight">AI 커리어 프로파일 진단 MVP</h1>
-            <p className="mt-1 text-sm text-slate-500">개인정보 입력 · 검사별 5문항 진단 · 후기 조사 후 베이직 리포트 · 자기소개서 첨삭(GPT 선택)</p>
+            <h1 className="text-xl font-black tracking-tight">AI 커리어핏 진단</h1>
+            <p className="mt-1 text-sm text-slate-500">직무기초역량·흥미·가치관·업무성향·취업준비도 기반 자체 커리어진단</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => switchTab("diagnosis")} className={`rounded-2xl px-4 py-2 text-sm font-black transition ${activeTab === "diagnosis" ? "bg-slate-900 text-white shadow-sm" : "border border-slate-200 bg-white hover:bg-slate-100"}`}>

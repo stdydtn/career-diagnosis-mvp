@@ -65,35 +65,42 @@ export default async function handler(req, res) {
 function buildPrompt({ mode, profile, answers, result, coverLetter, feedback }) {
   if (mode === "diagnosis") {
     return `
-아래 사용자의 진단 데이터를 바탕으로 AI 커리어 진단 결과를 생성하세요.
+너는 취업진로 코칭 전문가다.
+아래 검사 결과는 시스템이 코드로 계산한 결과다.
+점수를 임의로 변경하거나 새로 계산하지 말고, 제공된 결과를 바탕으로 해석만 작성하라.
+
+주의사항:
+- 특정 기업의 공식 인적성검사 결과처럼 표현하지 말 것
+- 합격 가능성을 단정하지 말 것
+- 사용자를 낙인찍는 표현을 쓰지 말 것
+- "위험군" 대신 "보완 필요 영역", "집중 관리가 필요한 영역"으로 표현할 것
+- 결과는 진로/취업 준비 참고자료임을 안내할 것
 
 [사용자 기본정보]
 ${JSON.stringify(profile, null, 2)}
 
-[진단 응답]
-${JSON.stringify(answers, null, 2)}
-
-[기존 계산 결과]
+[검사 결과 JSON]
 ${JSON.stringify(result, null, 2)}
 
 다음 JSON 형식으로만 답변하세요.
 
 {
-  "careerSummary": "사용자가 이해하기 쉬운 커리어 요약",
-  "mainStrengths": ["핵심 강점 1", "핵심 강점 2", "핵심 강점 3"],
-  "recommendedJobs": ["추천 직무 1", "추천 직무 2", "추천 직무 3", "추천 직무 4", "추천 직무 5"],
-  "preparationStage": {
-    "label": "탐색 우선형 또는 방향 설정형 또는 실행 강화형",
-    "description": "쉬운 설명"
-  },
-  "nextActions": ["실행전략 1", "실행전략 2", "실행전략 3", "실행전략 4"]
+  "interpretation": "종합 진단 요약",
+  "tips": ["강점 활용 팁 1", "보완 팁 2", "다음 액션 3"]
 }
 `;
   }
 
   if (mode === "report") {
     return `
-아래 데이터를 바탕으로 베이직 상세 리포트를 작성하세요.
+너는 취업진로 코칭 전문가다.
+아래 검사 결과는 시스템이 코드로 계산한 결과다.
+점수를 임의로 변경하거나 새로 계산하지 말고, 제공된 결과를 바탕으로 리포트만 작성하라.
+
+주의사항:
+- 특정 기업의 공식 인적성검사처럼 표현하지 말 것
+- 합격/불합격 가능성을 단정하지 말 것
+- 낙인 표현을 피하고 친절하고 현실적인 톤으로 작성할 것
 
 [사용자 기본정보]
 ${JSON.stringify(profile, null, 2)}
@@ -104,18 +111,19 @@ ${JSON.stringify(result, null, 2)}
 [후기조사]
 ${JSON.stringify(feedback, null, 2)}
 
-전문용어를 줄이고, 일반 사용자가 이해하기 쉬운 문장으로 작성하세요.
-"RIA형", "SEC형" 같은 코드 중심 표현은 사용하지 마세요.
-
 다음 JSON 형식으로만 답변하세요.
 
 {
-  "title": "쉬운 표현의 리포트 제목",
-  "summary": "상단 요약 문장",
-  "careerInterpretation": "쉽게 보는 진로 성향 설명",
-  "strengths": ["구체적인 강점 1", "구체적인 강점 2", "구체적인 강점 3"],
-  "recommendedJobs": ["추천 직무 1", "추천 직무 2", "추천 직무 3", "추천 직무 4", "추천 직무 5"],
-  "actionPlan": ["실행전략 1", "실행전략 2", "실행전략 3", "실행전략 4"]
+  "title": "리포트 제목",
+  "summary": "종합 진단 요약",
+  "careerInterpretation": "대표 커리어 유형 + 해석",
+  "strengths": ["강점 역량 TOP 3 설명"],
+  "improvements": ["보완 필요 영역 TOP 3 설명"],
+  "recommendedJobs": ["추천 직무군 TOP 5"],
+  "recommendedCompanyTypes": ["추천 기업유형"],
+  "selfIntroPoints": ["자기소개서 어필 포인트"],
+  "interviewDirections": ["면접 답변 방향"],
+  "actionPlan": ["앞으로 4주 준비 전략 4개"]
 }
 `;
   }
